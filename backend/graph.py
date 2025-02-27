@@ -14,6 +14,14 @@ class Neo4jConnection:
         self.password = os.getenv("NEO4J_PASSWORD")
         self.driver = GraphDatabase.driver(self.uri, auth=(self.user, self.password))
 
+        #connection test
+        try:
+            self.driver.verify_connectivity()
+            print("Successfully connected to Neo4j!")
+        except Exception as e:
+            print(f"Failed to connect to Neo4j: {e}")
+            raise  # Re-raise the exception to stop execution
+
     def close(self):
         self.driver.close()
     
@@ -23,16 +31,20 @@ class Neo4jConnection:
     
     @staticmethod
     def _create_image_node_tx(tx, image_path, embedding):
-        query = {
-            "CREATE (i:Image {path: $image_path, embedding: $embedding})"
+        query = (
+            "CREATE (i:Image {path: $image_path, embedding: $embedding}) "
             "RETURN i"
-        }
+        )
         result = tx.run(query, image_path=image_path, embedding=embedding)
         try:
-            return [{"id": record["i"].id, "path": record["i"]["path"]} for record in result]
+            record = result.single()  # Get the single record
+            if record:
+                return {"id": record["i"].element_id, "path": record["i"]["path"]}
+            else:
+                return {}  # Or handle the case where no node was created
         except Exception as e:
-            print(f'failed to create image node: {e}')
-            return []
+            print(f"Failed to create image node: {e}")
+            return {}
         
     def create_similarity_relationship(self, image_path1, image_path2, similarity):
         with self.driver.session() as session:
@@ -73,8 +85,8 @@ class Neo4jConnection:
         for record in result:
             neighbor = record["n"]
             relationship = record["r"]
-            nodes.append({"id": str(neighbor.id), "label": neighbor["path"], "path": neighbor["path"]}) #str the id for react-sigma
-            edges.append({"id": str(relationship.id), "source": str(neighbor.id), "target": str(neighbor.id), "weight": relationship["similarity"]}) #str the ids for react-sigma
+            nodes.append({"id": str(neighbor.element_id), "label": neighbor["path"], "path": neighbor["path"]}) #str the id for react-sigma
+            edges.append({"id": str(relationship.element_id), "source": str(neighbor.element_id), "target": str(neighbor.element_id), "weight": relationship["similarity"]}) #str the ids for react-sigma
         return {"nodes": nodes, "edges": edges}
     
     def clear_database(self):
@@ -114,6 +126,5 @@ def populate_graph(image_dir, similarity_threshold=0.7):
     db.close()
     print("Graph populated.")
 
-
 if __name__ == '__main__':
-    populate_graph('../images')
+    populate_graph('images')
