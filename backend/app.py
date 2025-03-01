@@ -5,6 +5,8 @@ import glob
 import logging
 import traceback
 import sys
+import time
+from concurrent.futures import ThreadPoolExecutor, TimeoutError
 
 print("Starting import of modules...")
 
@@ -14,31 +16,52 @@ from routes.api_routes import api_bp
 from routes.static_routes import static_bp
 
 print("Importing utils...")
-from utils.log_utils import setup_logging, log_startup_info
-from utils.template_utils import ensure_template_files
-from utils.image_utils import save_placeholder_image
+# Import the helper functions first
+from utils.image_utils import save_placeholder_image, normalize_image_path
 from config import IMAGES_DIR, IMAGE_EXTENSIONS
 
-# Import populate_graph
+# Initialize bare logging first
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(),  # Console output
+        logging.FileHandler('app.log', encoding='utf-8')  # File output
+    ]
+)
+logger = logging.getLogger('image-similarity')
+logger.info("Basic logging initialized")
+
+# Import graph last since it might be slow
 print("Importing graph module...")
 try:
     from graph import populate_graph
     print("Graph module imported successfully")
 except Exception as e:
     print(f"Error importing graph module: {e}")
+    logger.error(f"Error importing graph module: {e}")
     traceback.print_exc()
 
-# Initialize logging
-print("Setting up logging...")
-logger = setup_logging()
-print("Logging setup complete")
+def run_with_timeout(func, args=None, kwargs=None, timeout=10):
+    """Run a function with a timeout to prevent hanging"""
+    if args is None:
+        args = []
+    if kwargs is None:
+        kwargs = {}
+    
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        future = executor.submit(func, *args, **kwargs)
+        try:
+            return future.result(timeout=timeout)
+        except TimeoutError:
+            print(f"Function {func.__name__} timed out after {timeout} seconds")
+            logger.error(f"Function {func.__name__} timed out after {timeout} seconds")
+            return None
 
 def create_app():
     """Create and configure the Flask application"""
     try:
         print("Creating Flask app...")
-        # Ensure template files exist
-        ensure_template_files()
         
         # Create Flask app
         app = Flask(__name__, template_folder='templates')
@@ -67,37 +90,29 @@ def create_app():
     
     except Exception as e:
         print(f"Failed to create app: {str(e)}")
+        logger.error(f"Failed to create app: {str(e)}")
         traceback.print_exc()
         raise
 
 def main():
     try:
         print("Starting main function...")
-        # Log startup information
-        log_startup_info()
+        logger.info("Starting main function")
         
-        # Create a placeholder image at startup
+        # Create a placeholder image at startup - this should be quick
         print("Creating placeholder image...")
-        save_placeholder_image()
+        run_with_timeout(save_placeholder_image, timeout=5)
         
         # Check for image directory
         print(f"Checking image directory: {IMAGES_DIR}")
         if os.path.exists(IMAGES_DIR):
-            logger.info(f"Available images in {IMAGES_DIR}:")
-            image_count = 0
-            image_list = []
-            for ext in IMAGE_EXTENSIONS:
-                image_files = glob.glob(os.path.join(IMAGES_DIR, ext))
-                image_list.extend([os.path.basename(f) for f in image_files])
-                image_count += len(image_files)
+            logger.info(f"Available images in {IMAGES_DIR}")
             
-            # Log up to 10 image names
-            if image_list:
-                for img in image_list[:10]:
-                    logger.info(f" - {img}")
-                
-                if len(image_list) > 10:
-                    logger.info(f" ... and {len(image_list) - 10} more images")
+            # Quick count of images instead of detailed listing
+            image_count = 0
+            for ext in IMAGE_EXTENSIONS:
+                files = glob.glob(os.path.join(IMAGES_DIR, ext))
+                image_count += len(files)
             
             logger.info(f"Total images found: {image_count}")
         else:
@@ -105,42 +120,27 @@ def main():
         
         # Attempt to import and verify database connection
         print("Attempting to connect to database...")
+        db = None
         try:
             from database import get_db_connection
             print("Getting database connection...")
-            db = get_db_connection()
-            logger.info("Database connection verified")
+            # Set a timeout for database connection to avoid hanging
+            db = run_with_timeout(get_db_connection, timeout=10)
             
-            # Check if database is empty
-            print("Checking database contents...")
-            image_count = db.count_images()
-            logger.info(f"Current image nodes in database: {image_count}")
-            
-            # Populate graph if no images exist
-            if image_count == 0:
-                logger.info("Database is empty. Populating graph...")
-                print("Populating graph...")
-                result = populate_graph(IMAGES_DIR)
+            if db:
+                logger.info("Database connection verified")
                 
-                if result:
-                    # Verify population
-                    image_count = db.count_images()
-                    logger.info(f"Image nodes after population: {image_count}")
-                else:
-                    logger.error("Failed to populate graph")
-            
-            # Get sample images
-            try:
-                print("Getting sample images...")
-                all_images = db.get_all_images()
-                logger.info(f"Database contains {len(all_images)} image nodes")
-                if all_images:
-                    logger.info("Sample image paths:")
-                    for img in all_images[:5]:
-                        logger.info(f" - {img}")
-            except Exception as node_error:
-                print(f"Error retrieving image nodes: {node_error}")
-                logger.error(f"Error retrieving image nodes: {node_error}")
+                # Don't populate the graph on startup - it's too slow
+                # Instead inform the user they need to do it manually
+                image_count = db.count_images()
+                logger.info(f"Current image nodes in database: {image_count}")
+                
+                if image_count == 0:
+                    print("Database is empty. You can populate it from the admin panel.")
+                    logger.info("Database is empty. Use admin panel to populate it.")
+            else:
+                print("Database connection timed out - proceeding with limited functionality")
+                logger.warning("Database connection timed out - proceeding with limited functionality")
         except Exception as db_error:
             print(f"Database connection failed: {db_error}")
             logger.error(f"Database connection failed: {db_error}")

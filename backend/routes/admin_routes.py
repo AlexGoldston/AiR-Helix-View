@@ -168,16 +168,20 @@ def list_images():
     # List all image files
     image_files = []
     for ext in IMAGE_EXTENSIONS:
-        image_files.extend(glob.glob(os.path.join(IMAGES_DIR, ext)))
-        image_files.extend(glob.glob(os.path.join(IMAGES_DIR, ext.upper())))
+        # On Windows, we only need to do this once since the filesystem is case-insensitive
+        if os.name == 'nt':  # Windows
+            image_files.extend(glob.glob(os.path.join(IMAGES_DIR, ext)))
+        else:  # Linux, macOS, etc.
+            image_files.extend(glob.glob(os.path.join(IMAGES_DIR, ext)))
+            image_files.extend(glob.glob(os.path.join(IMAGES_DIR, ext.upper())))
     
-    # Format the results
-    images = [os.path.basename(f) for f in image_files]
+    # Format the results and remove duplicates
+    images = list(set(os.path.basename(f) for f in image_files))
     
     return jsonify({
         "images_dir": IMAGES_DIR,
         "image_count": len(images),
-        "images": images
+        "images": sorted(images)  # Sort for consistent output
     })
 
 @admin_bp.route('/debug/sync')
@@ -192,13 +196,19 @@ def debug_sync():
         
         # Get images from filesystem
         fs_images = []
+        # Use the same improved pattern as list_images to avoid duplicates
         for ext in IMAGE_EXTENSIONS:
-            fs_images.extend([os.path.basename(f) for f in glob.glob(os.path.join(IMAGES_DIR, ext))])
-            fs_images.extend([os.path.basename(f) for f in glob.glob(os.path.join(IMAGES_DIR, ext.upper()))])
+            if os.name == 'nt':  # Windows
+                fs_images.extend([os.path.basename(f) for f in glob.glob(os.path.join(IMAGES_DIR, ext))])
+            else:  # Linux, macOS, etc.
+                fs_images.extend([os.path.basename(f) for f in glob.glob(os.path.join(IMAGES_DIR, ext))])
+                fs_images.extend([os.path.basename(f) for f in glob.glob(os.path.join(IMAGES_DIR, ext.upper()))])
+        
+        # Remove duplicates
+        fs_images = list(set(fs_images))
         
         # Normalize all paths to just filenames
         db_images = [normalize_image_path(img) for img in db_images]
-        fs_images = [normalize_image_path(img) for img in fs_images]
         
         # Find differences
         missing_in_fs = [img for img in db_images if img not in fs_images]
