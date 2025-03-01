@@ -10,11 +10,10 @@ cd to ```./frontend```
 run ```npm start```
 
 current state
-![alt text](image-1.png)
+![alt text](image-2.png)
 
 
 ---
 
 for admin tasks, while backend running goto:
 ```http://127.0.0.1:5001/admin```
-![alt text](image.png)
