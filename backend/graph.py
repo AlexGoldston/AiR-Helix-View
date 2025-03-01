@@ -5,23 +5,30 @@ from dotenv import load_dotenv
 from embeddings import ImageEmbedder
 import numpy as np
 import glob
+import logging
 
-load_dotenv()
+# Configure logging
+logger = logging.getLogger('image-similarity')
 
 class Neo4jConnection:
     def __init__(self):
+        load_dotenv()
         self.uri = os.getenv("NEO4J_URI")
         self.user = os.getenv("NEO4J_USER")
         self.password = os.getenv("NEO4J_PASSWORD")
+        
+        logger.info(f"Attempting to connect to Neo4j at {self.uri}")
+        logger.info(f"Username: {self.user}")
+        
         self.driver = GraphDatabase.driver(self.uri, auth=(self.user, self.password))
 
-        #connection test
+        # Connection test
         try:
             self.driver.verify_connectivity()
-            print("Successfully connected to Neo4j!")
+            logger.info("Successfully connected to Neo4j!")
         except Exception as e:
-            print(f"Failed to connect to Neo4j: {e}")
-            raise  # Re-raise the exception to stop execution
+            logger.error(f"Failed to connect to Neo4j: {e}")
+            raise
 
     def close(self):
         self.driver.close()
@@ -78,36 +85,54 @@ class Neo4jConnection:
         return record["count"] if record else 0
     
     def create_image_node(self, image_path, embedding):
+        """Create a single image node with its embedding"""
         with self.driver.session() as session:
-            session.execute_write(self._create_image_node_tx, image_path, embedding)
+            try:
+                result = session.execute_write(
+                    self._create_image_node_tx, 
+                    image_path, 
+                    embedding
+                )
+                return result
+            except Exception as e:
+                logger.error(f"Error creating image node for {image_path}: {e}")
+                return None
     
     @staticmethod
     def _create_image_node_tx(tx, image_path, embedding):
-        query = (
-            "CREATE (i:Image {path: $image_path, embedding: $embedding}) "
-            "RETURN i"
-        )
-        result = tx.run(query, image_path=image_path, embedding=embedding)
         try:
-            record = result.single()  # Get the single record
-            if record:
-                return {"id": record["i"].element_id, "path": record["i"]["path"]}
-            else:
-                return {}  # Or handle the case where no node was created
+            query = (
+                "CREATE (i:Image {path: $image_path, embedding: $embedding}) "
+                "RETURN i"
+            )
+            result = tx.run(query, image_path=image_path, embedding=embedding)
+            record = result.single()
+            return {"id": record["i"].element_id, "path": record["i"]["path"]} if record else None
         except Exception as e:
-            print(f"Failed to create image node: {e}")
-            return {}
+            logger.error(f"Transaction error creating node: {e}")
+            raise
         
     def create_similarity_relationship(self, image_path1, image_path2, similarity):
+        """Create a similarity relationship between two image nodes"""
         with self.driver.session() as session:
-            session.execute_write(self._create_similarity_relationship_tx, image_path1, image_path2, similarity)
+            try:
+                result = session.execute_write(
+                    self._create_similarity_relationship_tx, 
+                    image_path1, 
+                    image_path2, 
+                    similarity
+                )
+                return result
+            except Exception as e:
+                logger.error(f"Error creating similarity between {image_path1} and {image_path2}: {e}")
+                return None
     
     @staticmethod
     def _create_similarity_relationship_tx(tx, image_path1, image_path2, similarity):
         query = (
             """
             MATCH (i1:Image {path: $image_path1})
-            MATCH (i2: Image {path: $image_path2})
+            MATCH (i2:Image {path: $image_path2})
             MERGE (i1)-[r:SIMILAR_TO {similarity: $similarity}]->(i2)
             RETURN r
             """
@@ -115,75 +140,12 @@ class Neo4jConnection:
         result = tx.run(query, image_path1=image_path1, image_path2=image_path2, similarity=similarity)
         return result.single()
     
-    def get_neighbors(self, image_path, similarity_threshold=0.7, limit=20):
-        with self.driver.session() as session:
-            return session.read_transaction(self._get_neighbors_tx, image_path, similarity_threshold, limit)
-    
-    @staticmethod
-    def _get_neighbors_tx(tx, image_path, similarity_threshold, limit):
-        # First, get the center node details
-        center_query = "MATCH (i:Image {path: $image_path}) RETURN i"
-        center_result = tx.run(center_query, image_path=image_path)
-        center_record = center_result.single()
-        
-        if not center_record:
-            print(f"Center node not found for path: {image_path}")
-            return {"nodes": [], "edges": []}
-            
-        center_node = center_record["i"]
-        center_id = str(center_node.element_id)
-        
-        print(f"Found center node: {center_node['path']} with ID: {center_id}")
-        
-        # Then get neighbors
-        query = (
-            """
-            MATCH (i:Image {path: $image_path})-[r:SIMILAR_TO]->(n:Image)
-            WHERE r.similarity >= $similarity_threshold
-            RETURN n, r
-            ORDER BY r.similarity DESC
-            LIMIT $limit
-            """
-        )
-        result = tx.run(query, image_path=image_path, similarity_threshold=similarity_threshold, limit=limit)
-        
-        # Format result for front end
-        nodes = [{"id": center_id, "label": center_node["path"], "path": center_node["path"], "isCenter": True}]
-        edges = []
-        
-        # Track processed nodes to avoid duplicates
-        processed_nodes = {center_id}
-        
-        for record in result:
-            neighbor = record["n"]
-            relationship = record["r"]
-            neighbor_id = str(neighbor.element_id)
-            
-            # Only add node if not already processed
-            if neighbor_id not in processed_nodes:
-                nodes.append({
-                    "id": neighbor_id, 
-                    "label": neighbor["path"], 
-                    "path": neighbor["path"]
-                })
-                processed_nodes.add(neighbor_id)
-            
-            # Fix: Correct the edge source and target
-            edges.append({
-                "id": str(relationship.element_id), 
-                "source": center_id,  # Center node is the source
-                "target": neighbor_id,  # Neighbor is the target
-                "weight": relationship["similarity"]
-            })
-        
-        print(f"Returning {len(nodes)} nodes and {len(edges)} edges")
-        
-        return {"nodes": nodes, "edges": edges}
-    
     def clear_database(self):
+        """Clear all nodes and relationships from the database"""
+        logger.info("Clearing entire database...")
         with self.driver.session() as session:
             session.execute_write(self._clear_database_tx)
-            print("Database cleared")
+            logger.info("Database cleared")
 
     @staticmethod
     def _clear_database_tx(tx):
@@ -201,55 +163,111 @@ def normalize_image_path(path):
     return os.path.basename(path)
 
 def populate_graph(image_dir, similarity_threshold=0.7):
-    print(f"Populating graph from {image_dir} with threshold {similarity_threshold}")
+    """
+    Populate the Neo4j graph database with image nodes and their similarities
     
-    embedder = ImageEmbedder()
-    db = Neo4jConnection()
-    db.clear_database() #start with clean db for POC
-
-    # Find all image files recursively
+    :param image_dir: Directory containing images
+    :param similarity_threshold: Minimum similarity to create a relationship
+    """
+    logger.info(f"Starting graph population from {image_dir}")
+    logger.info(f"Similarity threshold: {similarity_threshold}")
+    
+    # Validate image directory
+    if not os.path.exists(image_dir):
+        logger.error(f"Image directory does not exist: {image_dir}")
+        return False
+    
+    # Initialize embedder and database connection
+    try:
+        embedder = ImageEmbedder()
+        db = Neo4jConnection()
+    except Exception as e:
+        logger.error(f"Failed to initialize embedder or database: {e}")
+        return False
+    
+    # Clear existing database
+    try:
+        db.clear_database()
+        logger.info("Existing database cleared")
+    except Exception as e:
+        logger.error(f"Failed to clear database: {e}")
+        return False
+    
+    # Find all image files
     image_paths = []
     for ext in ['*.jpg', '*.jpeg', '*.png', '*.gif']:
         image_paths.extend(glob.glob(os.path.join(image_dir, ext)))
+        image_paths.extend(glob.glob(os.path.join(image_dir, ext.upper())))
     
-    print(f"Found {len(image_paths)} images")
+    logger.info(f"Found {len(image_paths)} images to process")
     
-    if not image_paths:
-        print(f"No images found in directory: {image_dir}")
-        return
-    
+    # Process and store image embeddings
     embeddings = {}
-
-    # Create nodes - store images with just the filename as the key
+    successful_nodes = 0
+    failed_nodes = 0
+    
+    # First pass: generate embeddings
     for image_path in image_paths:
         try:
-            # Get just the filename for storage in Neo4j
+            # Get just the filename
             filename = normalize_image_path(image_path)
             
-            print(f"Processing {filename}")
+            # Generate embedding
             embedding = embedder.get_embedding(image_path)
             
-            if embedding:
+            if embedding is not None:
                 embeddings[filename] = embedding
-                db.create_image_node(filename, embedding)
-                print(f"Created node for {filename}")
+                successful_nodes += 1
             else:
-                print(f"Failed to generate embedding for {filename}")
+                failed_nodes += 1
+                logger.warning(f"Failed to generate embedding for {filename}")
         except Exception as e:
-            print(f"Error processing {image_path}: {e}")
-
-    # Create relationships
-    for i, filename1 in enumerate(embeddings.keys()):
-        for j, filename2 in enumerate(embeddings.keys()):
-            if i != j: #dont compare image against itself!
-                similarity = calculate_cosine_similarity(embeddings[filename1], embeddings[filename2])
+            failed_nodes += 1
+            logger.error(f"Error processing {image_path}: {e}")
+    
+    logger.info(f"Embeddings generated: {successful_nodes} successful, {failed_nodes} failed")
+    
+    # Second pass: create nodes
+    for filename, embedding in embeddings.items():
+        try:
+            db.create_image_node(filename, embedding)
+        except Exception as e:
+            logger.error(f"Failed to create node for {filename}: {e}")
+    
+    # Third pass: create similarity relationships
+    relationship_count = 0
+    filenames = list(embeddings.keys())
+    
+    for i, filename1 in enumerate(filenames):
+        for filename2 in filenames[i+1:]:
+            try:
+                # Calculate similarity
+                similarity = calculate_cosine_similarity(
+                    embeddings[filename1], 
+                    embeddings[filename2]
+                )
+                
+                # Create relationship if above threshold
                 if similarity >= similarity_threshold:
                     db.create_similarity_relationship(filename1, filename2, similarity)
-                    print(f"Created relationship between {filename1} and {filename2} with similarity {similarity:.2f}")
+                    relationship_count += 1
+            except Exception as e:
+                logger.error(f"Error creating similarity between {filename1} and {filename2}: {e}")
     
-    print(f"Created {len(embeddings)} nodes with relationships")
+    # Final logging
+    logger.info(f"Graph population complete")
+    logger.info(f"Total nodes: {len(embeddings)}")
+    logger.info(f"Total relationships: {relationship_count}")
+    
+    # Verify database state
+    node_count = db.count_images()
+    logger.info(f"Nodes in database: {node_count}")
+    
+    # Close database connection
     db.close()
-    print("Graph populated.")
+    
+    return True
 
 if __name__ == '__main__':
+    # For manual testing
     populate_graph('images')
