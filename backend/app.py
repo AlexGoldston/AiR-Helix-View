@@ -1,6 +1,5 @@
-from flask import Flask, jsonify, request, send_from_directory, render_template_string, redirect
+from flask import Flask, jsonify, request, send_from_directory, render_template, redirect
 from flask_cors import CORS
-from graph import Neo4jConnection, populate_graph
 import os
 import glob
 import json
@@ -36,9 +35,10 @@ class MemoryLogHandler(logging.Handler):
     
     def get_logs(self, limit=100, level=None):
         with self.lock:
+            entries = list(self.log_entries)
             if level:
-                return list(filter(lambda x: x['level'] == level, list(self.log_entries)))[-limit:]
-            return list(self.log_entries)[-limit:]
+                entries = [entry for entry in entries if entry['level'] == level]
+            return entries[-limit:] if limit < len(entries) else entries
     
     def clear(self):
         with self.lock:
@@ -53,8 +53,313 @@ logger.addHandler(memory_handler)
 werkzeug_logger = logging.getLogger('werkzeug')
 werkzeug_logger.setLevel(logging.ERROR)  # Only show errors, not info
 
-app = Flask(__name__)
+# Initialize Flask app
+app = Flask(__name__, template_folder='templates')
 CORS(app, supports_credentials=True, resources={r"/*": {"origins": "*"}})  # Allow all origins
+
+# Create templates directory if it doesn't exist
+os.makedirs('templates', exist_ok=True)
+
+# Write admin template to file
+def ensure_template_files():
+    """Make sure template files exist"""
+    admin_template_path = os.path.join('templates', 'admin.html')
+    logs_template_path = os.path.join('templates', 'logs.html')
+    
+    # Only create if they don't exist
+    if not os.path.exists(admin_template_path):
+        with open(admin_template_path, 'w') as f:
+            f.write("""<!DOCTYPE html>
+<html>
+<head>
+    <title>Image Similarity Explorer Admin</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            max-width: 800px; 
+            margin: 0 auto; 
+            padding: 20px; 
+        }
+        button { 
+            padding: 10px; 
+            margin: 10px 0; 
+            cursor: pointer; 
+            background-color: #4285F4;
+            color: white;
+            border: none;
+            border-radius: 4px;
+        }
+        button:hover {
+            background-color: #3367D6;
+        }
+        .card { 
+            border: 1px solid #ccc; 
+            padding: 15px; 
+            margin: 15px 0; 
+            border-radius: 5px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        pre { 
+            background: #f5f5f5; 
+            padding: 10px; 
+            overflow: auto;
+            border-radius: 4px;
+        }
+        .logs-teaser { 
+            max-height: 150px; 
+            overflow: auto; 
+            font-family: monospace; 
+            font-size: 12px;
+            background-color: #f5f5f5;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        h1 {
+            color: #4285F4;
+        }
+        h2 {
+            color: #5F6368;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 8px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Image Similarity Explorer Admin</h1>
+    
+    <div class="card">
+        <h2>Database Management</h2>
+        <button id="resetDb">Reset Database & Repopulate</button>
+        <button id="fixDb">Fix Database (Remove Missing Images)</button>
+        <div id="dbResult"></div>
+    </div>
+    
+    <div class="card">
+        <h2>Database/Filesystem Sync</h2>
+        <button id="checkSync">Check Sync Status</button>
+        <div id="syncResult"></div>
+    </div>
+    
+    <div class="card">
+        <h2>Image Directory</h2>
+        <button id="listImages">List Available Images</button>
+        <div id="imagesResult"></div>
+    </div>
+    
+    <div class="card">
+        <h2>Database Status</h2>
+        <button id="checkDb">Check Database</button>
+        <div id="checkResult"></div>
+    </div>
+    
+    <div class="card">
+        <h2>Application Logs</h2>
+        <div class="logs-teaser" id="logsTeaser">Loading recent logs...</div>
+        <button onclick="window.location.href='/admin/logs'">View All Logs</button>
+        <button onclick="refreshLogs()">Refresh</button>
+    </div>
+    
+    <script>
+        // Fetch recent logs for the teaser
+        async function refreshLogs() {
+            try {
+                const response = await fetch('/admin/logs?format=json&limit=10');
+                const logs = await response.json();
+                
+                const logsHtml = logs.map(log => 
+                    `<div style="${getLogStyle(log.level)}">${log.timestamp} - ${log.level} - ${log.message}</div>`
+                ).join('');
+                
+                document.getElementById('logsTeaser').innerHTML = logsHtml || 'No logs available';
+            } catch (error) {
+                document.getElementById('logsTeaser').innerHTML = `Error loading logs: ${error.message}`;
+            }
+        }
+        
+        function getLogStyle(level) {
+            switch(level) {
+                case 'ERROR': return 'color: red;';
+                case 'WARNING': return 'color: orange;';
+                case 'INFO': return 'color: green;';
+                default: return '';
+            }
+        }
+        
+        document.getElementById('resetDb').addEventListener('click', async () => {
+            if (confirm('This will RESET the entire database and rebuild it from the images directory. Continue?')) {
+                try {
+                    const result = document.getElementById('dbResult');
+                    result.innerHTML = 'Processing...';
+                    
+                    const response = await fetch('/admin/reset-db', { method: 'POST' });
+                    const data = await response.json();
+                    
+                    result.innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+                    refreshLogs();
+                } catch (error) {
+                    document.getElementById('dbResult').innerHTML = `<pre>Error: ${error.message}</pre>`;
+                }
+            }
+        });
+        
+        document.getElementById('fixDb').addEventListener('click', async () => {
+            if (confirm('This will remove database nodes for images that don\\'t exist in the filesystem. Continue?')) {
+                try {
+                    const result = document.getElementById('dbResult');
+                    result.innerHTML = 'Processing...';
+                    
+                    const response = await fetch('/admin/fix-db', { method: 'POST' });
+                    const data = await response.json();
+                    
+                    result.innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+                    refreshLogs();
+                } catch (error) {
+                    document.getElementById('dbResult').innerHTML = `<pre>Error: ${error.message}</pre>`;
+                }
+            }
+        });
+        
+        document.getElementById('checkSync').addEventListener('click', async () => {
+            try {
+                const result = document.getElementById('syncResult');
+                result.innerHTML = 'Loading...';
+                
+                const response = await fetch('/debug/sync');
+                const data = await response.json();
+                
+                result.innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+            } catch (error) {
+                document.getElementById('syncResult').innerHTML = `<pre>Error: ${error.message}</pre>`;
+            }
+        });
+        
+        document.getElementById('listImages').addEventListener('click', async () => {
+            try {
+                const result = document.getElementById('imagesResult');
+                result.innerHTML = 'Loading...';
+                
+                const response = await fetch('/debug/images');
+                const data = await response.json();
+                
+                result.innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+            } catch (error) {
+                document.getElementById('imagesResult').innerHTML = `<pre>Error: ${error.message}</pre>`;
+            }
+        });
+        
+        document.getElementById('checkDb').addEventListener('click', async () => {
+            try {
+                const result = document.getElementById('checkResult');
+                result.innerHTML = 'Connecting to database...';
+                
+                const response = await fetch('/debug/db');
+                const data = await response.json();
+                
+                result.innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+            } catch (error) {
+                document.getElementById('checkResult').innerHTML = `<pre>Error: ${error.message}</pre>`;
+            }
+        });
+        
+        // Initial logs load
+        refreshLogs();
+    </script>
+</body>
+</html>""")
+        logger.info(f"Created admin template at {admin_template_path}")
+    
+    if not os.path.exists(logs_template_path):
+        with open(logs_template_path, 'w') as f:
+            f.write("""<!DOCTYPE html>
+<html>
+<head>
+    <title>Application Logs</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            margin: 20px; 
+        }
+        table { 
+            border-collapse: collapse; 
+            width: 100%; 
+        }
+        th, td { 
+            text-align: left; 
+            padding: 8px; 
+            border-bottom: 1px solid #ddd; 
+        }
+        th { 
+            background-color: #f2f2f2; 
+        }
+        tr:hover { 
+            background-color: #f5f5f5; 
+        }
+        .controls { 
+            margin-bottom: 20px; 
+        }
+        button { 
+            padding: 8px 12px; 
+            margin-right: 10px; 
+            background-color: #4285F4;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #3367D6;
+        }
+        h1 {
+            color: #4285F4;
+        }
+        .error {
+            color: red;
+        }
+        .warning {
+            color: orange;
+        }
+        .info {
+            color: green;
+        }
+    </style>
+</head>
+<body>
+    <h1>Application Logs</h1>
+    <div class="controls">
+        <button onclick="window.location.href='/admin/logs'">All Logs</button>
+        <button onclick="window.location.href='/admin/logs?level=ERROR'">Errors Only</button>
+        <button onclick="window.location.href='/admin/logs?level=WARNING'">Warnings Only</button>
+        <button onclick="window.location.href='/admin/logs?level=INFO'">Info Only</button>
+        <button onclick="clearLogs()">Clear Logs</button>
+        <button onclick="window.location.href='/admin'">Back to Admin</button>
+    </div>
+    <table>
+        <tr>
+            <th>Timestamp</th>
+            <th>Level</th>
+            <th>Message</th>
+        </tr>
+        {{ logs_html | safe }}
+    </table>
+    <script>
+        function clearLogs() {
+            if (confirm('Are you sure you want to clear all logs?')) {
+                fetch('/admin/logs/clear', { method: 'POST' })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.status === 'ok') {
+                            window.location.reload();
+                        }
+                    });
+            }
+        }
+    </script>
+</body>
+</html>""")
+        logger.info(f"Created logs template at {logs_template_path}")
+
+# Ensure template files exist
+ensure_template_files()
 
 # Configure the images directory paths to try
 POSSIBLE_IMAGE_DIRS = [
@@ -75,14 +380,57 @@ for path in POSSIBLE_IMAGE_DIRS:
         logger.info(f"Found images directory at: {IMAGES_DIR}")
         break
 
+# If no directory found, create one
 if not IMAGES_DIR:
-    logger.warning("Could not find any valid images directory!")
-    logger.info(f"Searched: {POSSIBLE_IMAGE_DIRS}")
-    logger.info(f"Current working directory: {os.getcwd()}")
-    IMAGES_DIR = "images"  # Fallback
+    # Use 'images' in the current directory as fallback
+    IMAGES_DIR = os.path.join(os.getcwd(), 'images')
+    try:
+        # Create the directory if it doesn't exist
+        os.makedirs(IMAGES_DIR, exist_ok=True)
+        logger.info(f"Created images directory at: {IMAGES_DIR}")
+    except Exception as e:
+        logger.error(f"Failed to create images directory: {e}")
+        # Last resort fallback
+        IMAGES_DIR = 'images'
 
-# Initialize database connection
-db = Neo4jConnection()
+logger.info(f"Using images directory: {IMAGES_DIR}")
+
+# Lazy-loaded Neo4j connection
+db = None
+
+def get_db():
+    """Lazily load the database connection when needed"""
+    global db
+    if db is None:
+        try:
+            from graph import Neo4jConnection, populate_graph
+            db = Neo4jConnection()
+            logger.info("Connected to Neo4j database")
+        except Exception as e:
+            logger.error(f"Failed to connect to Neo4j database: {e}")
+            # Create dummy DB to prevent crashes
+            class DummyDB:
+                def get_neighbors(self, *args, **kwargs):
+                    return {"nodes": [], "edges": []}
+                def get_all_images(self):
+                    return []
+                def get_sample_images(self, limit=10):
+                    return []
+                def find_image_by_path(self, path):
+                    return None
+                def count_images(self):
+                    return 0
+                def remove_images(self, paths):
+                    return 0
+                def clear_database(self):
+                    pass
+                class DummyDriver:
+                    def verify_connectivity(self):
+                        raise Exception("No database connection")
+                driver = DummyDriver()
+            db = DummyDB()
+            logger.warning("Using dummy database - functionality will be limited")
+    return db
 
 # Cache for image existence checks to reduce filesystem lookups
 IMAGE_EXISTENCE_CACHE = {}
@@ -92,21 +440,53 @@ MISSING_IMAGE_CACHE = set()
 # Generate a small placeholder image
 def generate_placeholder_image(color='#FF9999', size=(100, 100)):
     """Generate a base64 data URL for a placeholder image"""
-    from PIL import Image, ImageDraw
-    img = Image.new('RGB', size, color=color)
-    draw = ImageDraw.Draw(img)
-    
-    # Draw a border
-    border_color = '#CC0000'
-    draw.rectangle([(0, 0), (size[0]-1, size[1]-1)], outline=border_color, width=4)
-    
-    # Convert to base64
-    import io
-    buffer = io.BytesIO()
-    img.save(buffer, format='PNG')
-    img_str = base64.b64encode(buffer.getvalue()).decode('utf-8')
-    
-    return f"data:image/png;base64,{img_str}"
+    try:
+        from PIL import Image, ImageDraw
+        img = Image.new('RGB', size, color=color)
+        draw = ImageDraw.Draw(img)
+        
+        # Draw a border
+        border_color = '#CC0000'
+        draw.rectangle([(0, 0), (size[0]-1, size[1]-1)], outline=border_color, width=4)
+        
+        # Convert to base64
+        import io
+        buffer = io.BytesIO()
+        img.save(buffer, format='PNG')
+        img_str = base64.b64encode(buffer.getvalue()).decode('utf-8')
+        
+        return f"data:image/png;base64,{img_str}"
+    except ImportError:
+        logger.warning("PIL not installed - cannot generate placeholder image")
+        return None
+    except Exception as e:
+        logger.error(f"Error generating placeholder: {e}")
+        return None
+
+# Save a placeholder image file
+def save_placeholder_image(output_path='placeholder.png'):
+    try:
+        from PIL import Image, ImageDraw, ImageFont
+        img = Image.new('RGB', (200, 120), color='#FF9999')
+        draw = ImageDraw.Draw(img)
+        
+        # Draw a border
+        border_color = '#CC0000'
+        draw.rectangle([(0, 0), (199, 119)], outline=border_color, width=4)
+        
+        # Add text
+        draw.text((100, 60), "No Image", fill="#FFFFFF")
+        
+        # Save the image
+        img.save(output_path)
+        logger.info(f"Generated placeholder image at {output_path}")
+        return True
+    except ImportError:
+        logger.warning("PIL not installed - cannot generate placeholder image")
+        return False
+    except Exception as e:
+        logger.error(f"Error generating placeholder: {e}")
+        return False
 
 # Helper function to normalize image paths
 def normalize_image_path(path):
@@ -145,6 +525,15 @@ def image_exists(filename):
     IMAGE_EXISTENCE_CACHE[filename] = exists
     return exists
 
+# Helper function to import populate_graph only when needed
+def get_populate_graph():
+    try:
+        from graph import populate_graph
+        return populate_graph
+    except ImportError:
+        logger.error("Could not import populate_graph function")
+        return None
+
 # Endpoint to view logs
 @app.route('/admin/logs')
 def view_logs():
@@ -170,55 +559,7 @@ def view_logs():
             
         logs_html += f"<tr><td>{log['timestamp']}</td><td style='{level_class}'>{log['level']}</td><td>{log['message']}</td></tr>"
     
-    return render_template_string("""
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>Application Logs</title>
-            <style>
-                body { font-family: Arial, sans-serif; margin: 20px; }
-                table { border-collapse: collapse; width: 100%; }
-                th, td { text-align: left; padding: 8px; border-bottom: 1px solid #ddd; }
-                th { background-color: #f2f2f2; }
-                tr:hover { background-color: #f5f5f5; }
-                .controls { margin-bottom: 20px; }
-                button { padding: 8px 12px; margin-right: 10px; }
-            </style>
-        </head>
-        <body>
-            <h1>Application Logs</h1>
-            <div class="controls">
-                <button onclick="window.location.href='/admin/logs'">All Logs</button>
-                <button onclick="window.location.href='/admin/logs?level=ERROR'">Errors Only</button>
-                <button onclick="window.location.href='/admin/logs?level=WARNING'">Warnings Only</button>
-                <button onclick="window.location.href='/admin/logs?level=INFO'">Info Only</button>
-                <button onclick="clearLogs()">Clear Logs</button>
-                <button onclick="window.location.href='/admin'">Back to Admin</button>
-            </div>
-            <table>
-                <tr>
-                    <th>Timestamp</th>
-                    <th>Level</th>
-                    <th>Message</th>
-                </tr>
-                {{ logs_html | safe }}
-            </table>
-            <script>
-                function clearLogs() {
-                    if (confirm('Are you sure you want to clear all logs?')) {
-                        fetch('/admin/logs/clear', { method: 'POST' })
-                            .then(response => response.json())
-                            .then(data => {
-                                if (data.status === 'ok') {
-                                    window.location.reload();
-                                }
-                            });
-                    }
-                }
-            </script>
-        </body>
-        </html>
-    """, logs_html=logs_html)
+    return render_template('logs.html', logs_html=logs_html)
 
 # Endpoint to clear logs
 @app.route('/admin/logs/clear', methods=['POST'])
@@ -227,35 +568,36 @@ def clear_logs():
     return jsonify({"status": "ok"})
 
 # Endpoint to provide a placeholder image for missing images
-@app.route('/placeholder/<color>')
-def placeholder_image(color='FF9999'):
+@app.route('/placeholder')
+def placeholder_image():
     """Return a placeholder image for missing images"""
     try:
-        # Clean the color input
-        color = color.strip('#')
-        if len(color) == 6:
-            color = f"#{color}"
-        else:
-            color = "#FF9999"  # Default fallback
-            
-        # Generate the image 
-        img_data = generate_placeholder_image(color)
-        # Strip the data:image/png;base64, prefix
-        img_data = img_data.split(',')[1]
+        # Check if we have a placeholder file already
+        placeholder_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'placeholder.png')
+        if not os.path.exists(placeholder_path):
+            # Try to generate one
+            save_placeholder_image(placeholder_path)
         
-        # Convert base64 to binary
-        img_binary = base64.b64decode(img_data)
-        
-        # Return as an actual image
-        response = app.response_class(
-            response=img_binary,
-            status=200,
-            mimetype='image/png'
-        )
-        return response
+        if os.path.exists(placeholder_path):
+            # Return the placeholder file
+            with open(placeholder_path, 'rb') as f:
+                img_data = f.read()
+                response = app.response_class(
+                    response=img_data,
+                    status=200,
+                    mimetype='image/png'
+                )
+                return response
     except Exception as e:
-        logger.error(f"Error generating placeholder: {e}")
-        return "Error", 500
+        logger.error(f"Error serving placeholder: {e}")
+    
+    # Final fallback
+    response = app.response_class(
+        response=b"Placeholder",
+        status=200,
+        mimetype='text/plain'
+    )
+    return response
 
 # Debug endpoint to list all available images
 @app.route('/debug/images')
@@ -264,8 +606,7 @@ def list_images():
     if not os.path.exists(IMAGES_DIR):
         return jsonify({
             "error": f"Images directory not found: {IMAGES_DIR}",
-            "cwd": os.getcwd(),
-            "tried_paths": POSSIBLE_IMAGE_DIRS
+            "cwd": os.getcwd()
         }), 404
     
     # List all image files
@@ -288,6 +629,9 @@ def list_images():
 def debug_sync():
     """Compare database images with filesystem images"""
     try:
+        # Get database connection
+        db = get_db()
+        
         # Get images from database
         db_images = db.get_all_images()
         
@@ -313,6 +657,7 @@ def debug_sync():
             "sync_needed": len(missing_in_fs) > 0 or len(missing_in_db) > 0
         })
     except Exception as e:
+        logger.error(f"Error checking sync: {e}")
         return jsonify({
             "error": str(e)
         }), 500
@@ -322,6 +667,9 @@ def debug_sync():
 def debug_db():
     """Check Neo4j database connection and contents"""
     try:
+        # Get database connection
+        db = get_db()
+        
         # Check connection
         db.driver.verify_connectivity()
         
@@ -347,6 +695,7 @@ def debug_db():
             "image_with_prefix_found": image_node_with_prefix is not None
         })
     except Exception as e:
+        logger.error(f"Error checking database: {e}")
         return jsonify({
             "connection": "ERROR",
             "error": str(e)
@@ -372,7 +721,22 @@ def reset_db():
                 "error": f"No images found in directory: {IMAGES_DIR}"
             }), 404
             
+        # Get database connection
+        db = get_db()
+        
+        # Get populate_graph function
+        populate_graph = get_populate_graph()
+        if not populate_graph:
+            return jsonify({
+                "error": "Could not import populate_graph function"
+            }), 500
+            
+        # Clear the database first
+        logger.info("Clearing database before repopulation")
+        db.clear_database()
+        
         # Populate the graph
+        logger.info(f"Populating graph from {IMAGES_DIR} with {len(image_files)} images")
         populate_graph(IMAGES_DIR)
         
         # Clear image existence cache after repopulating
@@ -395,6 +759,9 @@ def reset_db():
 def fix_db():
     """Remove nodes for images that don't exist in the filesystem"""
     try:
+        # Get database connection
+        db = get_db()
+        
         # Get all image nodes
         image_nodes = db.get_all_images()
         
@@ -451,6 +818,9 @@ def get_neighbors():
     if not image_path:
         return jsonify({"error": "image_path is required"}), 400
         
+    # Get database connection
+    db = get_db()
+    
     # First try with the path as provided
     graph_data = db.get_neighbors(image_path, similarity_threshold, limit)
     
@@ -479,7 +849,7 @@ def get_neighbors():
             if graph_data.get('nodes'):
                 logger.info(f"Found center node with filename: {filename}")
     
-    # Log the output at info level
+    # Log the output
     logger.info(f"Returning data with {len(graph_data.get('nodes', []))} nodes and {len(graph_data.get('edges', []))} edges")
     
     # Filter out nodes for images that don't exist
@@ -525,7 +895,7 @@ def serve_image(filename):
     
     # Skip cache check and logging for images we know don't exist
     if filename in MISSING_IMAGE_CACHE:
-        return redirect('/placeholder/FF9999', code=303)
+        return redirect('/placeholder', code=302)
     
     # Look for the file with case-insensitive matching
     real_filename = None
@@ -549,7 +919,7 @@ def serve_image(filename):
             MISSING_IMAGE_CACHE.add(filename)
         
         # Redirect to placeholder
-        return redirect('/placeholder/FF9999', code=303)
+        return redirect('/placeholder', code=302)
         
     # Log successful requests at debug level
     logger.debug(f"Serving image: {real_filename}")
@@ -561,173 +931,19 @@ def serve_image(filename):
     response.headers['Expires'] = '0'
     return response
 
-# Simple HTML admin dashboard
+# Admin dashboard using template
 @app.route('/admin')
 def admin_dashboard():
-    html = """
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>Image Similarity Explorer Admin</title>
-        <style>
-            body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
-            button { padding: 10px; margin: 10px 0; cursor: pointer; }
-            .card { border: 1px solid #ccc; padding: 15px; margin: 15px 0; border-radius: 5px; }
-            pre { background: #f5f5f5; padding: 10px; overflow: auto; }
-            .logs-teaser { max-height: 150px; overflow: auto; font-family: monospace; font-size: 12px; }
-        </style>
-    </head>
-    <body>
-        <h1>Image Similarity Explorer Admin</h1>
-        
-        <div class="card">
-            <h2>Database Management</h2>
-            <button id="resetDb">Reset Database & Repopulate</button>
-            <button id="fixDb">Fix Database (Remove Missing Images)</button>
-            <div id="resetResult"></div>
-        </div>
-        
-        <div class="card">
-            <h2>Database/Filesystem Sync</h2>
-            <button id="checkSync">Check Sync Status</button>
-            <div id="syncResult"></div>
-        </div>
-        
-        <div class="card">
-            <h2>Image Directory</h2>
-            <button id="listImages">List Available Images</button>
-            <div id="imagesResult"></div>
-        </div>
-        
-        <div class="card">
-            <h2>Database Status</h2>
-            <button id="checkDb">Check Database</button>
-            <div id="dbResult"></div>
-        </div>
-        
-        <div class="card">
-            <h2>Application Logs</h2>
-            <div class="logs-teaser" id="logsTeaser">Loading recent logs...</div>
-            <button onclick="window.location.href='/admin/logs'">View All Logs</button>
-            <button onclick="window.location.href='/admin/logs?level=ERROR'">View Errors</button>
-            <button onclick="refreshLogs()">Refresh</button>
-        </div>
-        
-        <script>
-            // Fetch recent logs for the teaser
-            async function refreshLogs() {
-                try {
-                    const response = await fetch('/admin/logs?format=json&limit=10');
-                    const logs = await response.json();
-                    
-                    const logsHtml = logs.map(log => 
-                        `<div style="${getLogStyle(log.level)}">${log.timestamp} - ${log.level} - ${log.message}</div>`
-                    ).join('');
-                    
-                    document.getElementById('logsTeaser').innerHTML = logsHtml || 'No logs available';
-                } catch (error) {
-                    document.getElementById('logsTeaser').innerHTML = `Error loading logs: ${error.message}`;
-                }
-            }
-            
-            function getLogStyle(level) {
-                switch(level) {
-                    case 'ERROR': return 'color: red;';
-                    case 'WARNING': return 'color: orange;';
-                    case 'INFO': return 'color: green;';
-                    default: return '';
-                }
-            }
-            
-            document.getElementById('resetDb').addEventListener('click', async () => {
-                if (confirm('This will RESET the entire database and rebuild it from the images directory. Continue?')) {
-                    try {
-                        const result = document.getElementById('resetResult');
-                        result.innerHTML = 'Processing...';
-                        
-                        const response = await fetch('/admin/reset-db', { method: 'POST' });
-                        const data = await response.json();
-                        
-                        result.innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
-                        refreshLogs();
-                    } catch (error) {
-                        document.getElementById('resetResult').innerHTML = `<pre>Error: ${error.message}</pre>`;
-                    }
-                }
-            });
-            
-            document.getElementById('fixDb').addEventListener('click', async () => {
-                if (confirm('This will remove database nodes for images that don\\'t exist in the filesystem. Continue?')) {
-                    try {
-                        const result = document.getElementById('resetResult');
-                        result.innerHTML = 'Processing...';
-                        
-                        const response = await fetch('/admin/fix-db', { method: 'POST' });
-                        const data = await response.json();
-                        
-                        result.innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
-                        refreshLogs();
-                    } catch (error) {
-                        document.getElementById('resetResult').innerHTML = `<pre>Error: ${error.message}</pre>`;
-                    }
-                }
-            });
-            
-            document.getElementById('checkSync').addEventListener('click', async () => {
-                try {
-                    const result = document.getElementById('syncResult');
-                    result.innerHTML = 'Loading...';
-                    
-                    const response = await fetch('/debug/sync');
-                    const data = await response.json();
-                    
-                    result.innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
-                } catch (error) {
-                    document.getElementById('syncResult').innerHTML = `<pre>Error: ${error.message}</pre>`;
-                }
-            });
-            
-            document.getElementById('listImages').addEventListener('click', async () => {
-                try {
-                    const result = document.getElementById('imagesResult');
-                    result.innerHTML = 'Loading...';
-                    
-                    const response = await fetch('/debug/images');
-                    const data = await response.json();
-                    
-                    result.innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
-                } catch (error) {
-                    document.getElementById('imagesResult').innerHTML = `<pre>Error: ${error.message}</pre>`;
-                }
-            });
-            
-            document.getElementById('checkDb').addEventListener('click', async () => {
-                try {
-                    const result = document.getElementById('dbResult');
-                    result.innerHTML = 'Loading...';
-                    
-                    const response = await fetch('/debug/db');
-                    const data = await response.json();
-                    
-                    result.innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
-                } catch (error) {
-                    document.getElementById('dbResult').innerHTML = `<pre>Error: ${error.message}</pre>`;
-                }
-            });
-            
-            // Initial logs load
-            refreshLogs();
-        </script>
-    </body>
-    </html>
-    """
-    return render_template_string(html)
+    return render_template('admin.html')
 
 @app.route('/')
 def index():
     return "Image similarity API - Visit /admin for management"
 
 if __name__ == '__main__':
+    # Create a placeholder image if possible
+    save_placeholder_image()
+    
     # List available images to help with troubleshooting
     if os.path.exists(IMAGES_DIR):
         logger.info(f"Available images in {IMAGES_DIR}:")

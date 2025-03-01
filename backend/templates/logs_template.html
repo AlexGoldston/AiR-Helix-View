@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Application Logs</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            margin: 20px; 
+        }
+        table { 
+            border-collapse: collapse; 
+            width: 100%; 
+        }
+        th, td { 
+            text-align: left; 
+            padding: 8px; 
+            border-bottom: 1px solid #ddd; 
+        }
+        th { 
+            background-color: #f2f2f2; 
+        }
+        tr:hover { 
+            background-color: #f5f5f5; 
+        }
+        .controls { 
+            margin-bottom: 20px; 
+        }
+        button { 
+            padding: 8px 12px; 
+            margin-right: 10px; 
+            background-color: #4285F4;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #3367D6;
+        }
+        h1 {
+            color: #4285F4;
+        }
+        .error {
+            color: red;
+        }
+        .warning {
+            color: orange;
+        }
+        .info {
+            color: green;
+        }
+    </style>
+</head>
+<body>
+    <h1>Application Logs</h1>
+    <div class="controls">
+        <button onclick="window.location.href='/admin/logs'">All Logs</button>
+        <button onclick="window.location.href='/admin/logs?level=ERROR'">Errors Only</button>
+        <button onclick="window.location.href='/admin/logs?level=WARNING'">Warnings Only</button>
+        <button onclick="window.location.href='/admin/logs?level=INFO'">Info Only</button>
+        <button onclick="clearLogs()">Clear Logs</button>
+        <button onclick="window.location.href='/admin'">Back to Admin</button>
+    </div>
+    <table>
+        <tr>
+            <th>Timestamp</th>
+            <th>Level</th>
+            <th>Message</th>
+        </tr>
+        {{ logs_html | safe }}
+    </table>
+    <script>
+        function clearLogs() {
+            if (confirm('Are you sure you want to clear all logs?')) {
+                fetch('/admin/logs/clear', { method: 'POST' })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.status === 'ok') {
+                            window.location.reload();
+                        }
+                    });
+            }
+        }
+    </script>
+</body>
+</html>
