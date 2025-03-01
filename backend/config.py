@@ -18,11 +18,11 @@ LOG_MAX_ENTRIES = 1000
 
 # Image directory configuration
 POSSIBLE_IMAGE_DIRS = [
-    os.path.join('..', 'frontend', 'public', 'images'),
-    'images',
+    r'C:\Users\alexa\dev\AiR-Helix-View\frontend\public\images',  # Absolute path for Windows
+    os.path.join('..', 'frontend', 'public', 'images'),  # Relative path
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'frontend', 'public', 'images'),  # Another relative path
+    'images',  # Fallback local directory
     os.path.join('frontend', 'public', 'images'),
-    os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'frontend', 'public', 'images'),
-    os.path.join('..', 'public', 'images'),
     os.path.join(os.getcwd(), 'images'),
     os.path.join(os.getcwd(), '..', 'frontend', 'public', 'images')
 ]

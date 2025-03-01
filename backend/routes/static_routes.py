@@ -59,6 +59,8 @@ def serve_image(filename):
     # Look for the file with case-insensitive matching
     real_filename = None
     full_path = os.path.join(IMAGES_DIR, filename)
+    logger.debug(f"Attempting to find image: {filename}")
+    logger.debug(f"Images directory being searched: {IMAGES_DIR}")
     
     # Check if file exists directly
     if os.path.exists(full_path) and os.path.isfile(full_path):
@@ -67,19 +69,51 @@ def serve_image(filename):
     else:
         # Try to find the file with case-insensitive matching
         try:
-            for f in os.listdir(IMAGES_DIR):
+            # List directory contents and print for debugging
+            try:
+                dir_contents = os.listdir(IMAGES_DIR)
+                logger.debug(f"Directory contents: {dir_contents}")
+            except Exception as list_error:
+                logger.error(f"Error listing directory contents: {list_error}")
+                dir_contents = []
+            
+            # Case-insensitive search
+            for f in dir_contents:
                 if f.lower() == filename.lower():
                     real_filename = f
                     logger.debug(f"Found case-insensitive match: {f}")
                     break
         except Exception as e:
-            logger.error(f"Error listing directory {IMAGES_DIR}: {e}")
+            logger.error(f"Error searching directory {IMAGES_DIR}: {e}")
+    
+    if not real_filename:
+        # Attempt to search in subdirectories
+        try:
+            # Use os.walk to recursively search all subdirectories
+            for root, dirs, files in os.walk(IMAGES_DIR):
+                for f in files:
+                    if f.lower() == filename.lower():
+                        real_filename = f
+                        logger.debug(f"Found image in subdirectory: {f}")
+                        break
+                if real_filename:
+                    break
+        except Exception as walk_error:
+            logger.error(f"Error walking directory {IMAGES_DIR}: {walk_error}")
     
     if not real_filename:
         # Only log the first occurrence of each missing image
         if filename not in MISSING_IMAGE_CACHE:
-            logger.warning(f"Image not found: {filename} in {IMAGES_DIR}")
-            logger.warning(f"Absolute path would be: {os.path.abspath(full_path)}")
+            logger.warning(f"Image not found: {filename}")
+            logger.warning(f"Images directory: {IMAGES_DIR}")
+            logger.warning(f"Absolute path attempted: {os.path.abspath(full_path)}")
+            
+            # Print directory contents for debugging
+            try:
+                logger.warning(f"Directory contents: {os.listdir(IMAGES_DIR)}")
+            except Exception as list_error:
+                logger.warning(f"Could not list directory contents: {list_error}")
+            
             # Add to cache to avoid repeat logging
             MISSING_IMAGE_CACHE.add(filename)
         
