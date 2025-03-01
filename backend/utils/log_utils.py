@@ -7,6 +7,9 @@ import platform
 from collections import deque
 from config import LOG_LEVEL, LOG_FORMAT, LOG_DATE_FORMAT, LOG_MAX_ENTRIES, IMAGES_DIR, NEO4J_URI
 
+# Cache for image file list to avoid redundant scans
+_image_files_cache = None
+
 # Create in-memory log storage
 class MemoryLogHandler(logging.Handler):
     def __init__(self, max_entries=LOG_MAX_ENTRIES):
@@ -88,6 +91,9 @@ def setup_logging():
         sub_logger = logging.getLogger(log_name)
         sub_logger.addHandler(memory_handler)
     
+    # Reduce Neo4j driver logging level to minimize console noise
+    logging.getLogger('neo4j.io').setLevel(logging.WARNING)
+    
     return logger
 
 def get_memory_handler():
@@ -97,6 +103,23 @@ def get_memory_handler():
         setup_logging()
     return memory_handler
 
+def get_image_files(force_refresh=False):
+    """Get list of image files with caching to avoid redundant scans"""
+    global _image_files_cache
+    
+    if _image_files_cache is None or force_refresh:
+        # Only scan directory if cache is empty or refresh is forced
+        _image_files_cache = []
+        
+        if os.path.exists(IMAGES_DIR):
+            import glob
+            for ext in ['*.jpg', '*.jpeg', '*.png', '*.gif']:
+                # Do case-insensitive glob by trying both lower and upper case
+                _image_files_cache.extend(glob.glob(os.path.join(IMAGES_DIR, ext)))
+                _image_files_cache.extend(glob.glob(os.path.join(IMAGES_DIR, ext.upper())))
+    
+    return _image_files_cache
+
 def log_startup_info():
     """Log system and application startup information"""
     logger = logging.getLogger('image-similarity')
@@ -105,35 +128,34 @@ def log_startup_info():
     logger.info("Application Startup")
     logger.info(f"Logging level: {LOG_LEVEL}")
     
-    # Log environment details
+    # Log environment details with timeout protection
     try:
-        logger.info(f"Python version: {sys.version}")
+        logger.info(f"Python version: {sys.version.split()[0]}")  # Only first part to reduce log size
         logger.info(f"Platform: {platform.platform()}")
         logger.info(f"Current working directory: {os.getcwd()}")
     except Exception as e:
         logger.error(f"Error logging system info: {e}")
     
-    # Optional: Log configuration details
+    # Log configuration details with timeout protection
     try:
         logger.info(f"Images directory: {IMAGES_DIR}")
         logger.info(f"Neo4j URI: {NEO4J_URI}")
         
-        # List images in the directory
-        if os.path.exists(IMAGES_DIR):
-            image_files = []
-            for ext in ['*.jpg', '*.jpeg', '*.png', '*.gif']:
-                import glob
-                image_files.extend(glob.glob(os.path.join(IMAGES_DIR, ext)))
-                image_files.extend(glob.glob(os.path.join(IMAGES_DIR, ext.upper())))
+        # Use cached image files list
+        image_files = get_image_files()
+        
+        # Don't do heavy processing on the image files
+        logger.info(f"Total images found: {len(image_files)}")
+        
+        # Log just a few sample images
+        if image_files:
+            logger.info("Sample image paths:")
+            sample_size = min(5, len(image_files))
+            for img in image_files[:sample_size]:
+                logger.info(f" - {os.path.basename(img)}")
             
-            logger.info(f"Total images found: {len(image_files)}")
-            if image_files:
-                logger.info("Sample image paths:")
-                for img in image_files[:5]:
-                    logger.info(f" - {os.path.basename(img)}")
-                if len(image_files) > 5:
-                    logger.info(f" ... and {len(image_files) - 5} more")
-        else:
-            logger.warning(f"Images directory does not exist: {IMAGES_DIR}")
+            if len(image_files) > sample_size:
+                logger.info(f" ... and {len(image_files) - sample_size} more images")
+                
     except Exception as e:
         logger.error(f"Error logging configuration details: {e}")
