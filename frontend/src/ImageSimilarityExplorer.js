@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import ForceGraph2D from 'react-force-graph-2d';
 
 const ImageSimilarityExplorer = () => {
   const [graphData, setGraphData] = useState({ nodes: [], links: [] });
-  const [centerImage, setCenterImage] = useState('allianz_stadium_sydney01.jpg');
+  const [centerImage, setCenterImage] = useState('central_coast_stadium01.jpg');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [similarityThreshold, setSimilarityThreshold] = useState(0.63);
@@ -15,7 +15,7 @@ const ImageSimilarityExplorer = () => {
   const graphRef = useRef(null);
   
   // Extract filename from path
-  const getImageName = (path) => {
+  const getImageName = useCallback((path) => {
     if (!path) return 'unknown';
     
     // Remove any "images/" prefix
@@ -26,10 +26,10 @@ const ImageSimilarityExplorer = () => {
     
     // Get just the filename
     return filename.split('/').pop().split('\\').pop();
-  };
+  }, []);
   
   // Preload an image and store it in cache
-  const preloadImage = (path) => {
+  const preloadImage = useCallback((path) => {
     return new Promise((resolve, reject) => {
       if (!path) {
         reject(new Error("Invalid path"));
@@ -48,7 +48,7 @@ const ImageSimilarityExplorer = () => {
       };
       img.src = `http://localhost:5001/static/${filename}?v=${Date.now()}`;
     });
-  };
+  }, [getImageName]);
   
   // Fetch data from the backend API
   useEffect(() => {
@@ -134,24 +134,104 @@ const ImageSimilarityExplorer = () => {
     };
     
     fetchData();
-  }, [centerImage, similarityThreshold, neighborLimit]);
+  }, [centerImage, similarityThreshold, neighborLimit, preloadImage, getImageName]);
   
   // Handle node click to change center image
-  const handleNodeClick = node => {
+  const handleNodeClick = useCallback((node) => {
     console.log("Node clicked:", node);
     if (node && node.path && !node.isCenter) {
       setCenterImage(node.path);
     }
-  };
+  }, []);
+  
+  // Custom node rendering to show actual images
+  const nodeCanvasObject = useCallback((node, ctx, globalScale) => {
+    const nodeSize = node.isCenter ? 60 : 40;
+    const img = imagesCache.current[node.path];
+    
+    if (img) {
+      // Draw image as circle
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(node.x, node.y, nodeSize, 0, Math.PI * 2);
+      ctx.closePath();
+      ctx.clip();
+      
+      // Scale and center the image
+      const scale = Math.min(
+        nodeSize * 2 / img.width, 
+        nodeSize * 2 / img.height
+      );
+      const scaledWidth = img.width * scale;
+      const scaledHeight = img.height * scale;
+      
+      ctx.drawImage(
+        img, 
+        node.x - scaledWidth / 2, 
+        node.y - scaledHeight / 2, 
+        scaledWidth, 
+        scaledHeight
+      );
+      
+      ctx.restore();
+      
+      // Draw border
+      ctx.beginPath();
+      ctx.arc(node.x, node.y, nodeSize, 0, Math.PI * 2);
+      ctx.strokeStyle = node.isCenter ? 'red' : 'blue';
+      ctx.lineWidth = 3;
+      ctx.stroke();
+      
+      // Optionally add similarity text
+      if (!node.isCenter) {
+        const similarityLink = graphData.links.find(link => 
+          link.source === node.id || link.target === node.id
+        );
+        
+        if (similarityLink) {
+          ctx.fillStyle = 'black';
+          ctx.font = '12px Arial';
+          ctx.textAlign = 'center';
+          ctx.fillText(
+            `${(similarityLink.value * 100).toFixed(0)}%`, 
+            node.x, 
+            node.y + nodeSize + 15
+          );
+        }
+      }
+    } else {
+      // Fallback for images that haven't loaded
+      ctx.beginPath();
+      ctx.arc(node.x, node.y, nodeSize, 0, Math.PI * 2);
+      ctx.fillStyle = node.isCenter ? 'rgba(255,0,0,0.3)' : 'rgba(0,0,255,0.3)';
+      ctx.fill();
+      
+      ctx.fillStyle = 'black';
+      ctx.font = '12px Arial';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(getImageName(node.path), node.x, node.y);
+    }
+  }, [graphData, getImageName]);
   
   // Debug panel
   const renderDebugPanel = () => {
     if (!debugData) return null;
     
     return (
-      <div style={{ position: 'absolute', top: '10px', right: '10px', background: 'rgba(255,255,255,0.9)', 
-                   padding: '10px', border: '1px solid #ccc', maxWidth: '400px', maxHeight: '80vh', 
-                   overflow: 'auto', fontSize: '12px', zIndex: 1000 }}>
+      <div style={{ 
+        position: 'absolute', 
+        top: '10px', 
+        right: '10px', 
+        background: 'rgba(255,255,255,0.9)', 
+        padding: '10px', 
+        border: '1px solid #ccc', 
+        maxWidth: '400px', 
+        maxHeight: '80vh', 
+        overflow: 'auto', 
+        fontSize: '12px', 
+        zIndex: 1000 
+      }}>
         <h3>API Response</h3>
         <div>Nodes: {debugData.nodes?.length || 0}</div>
         <div>Edges: {debugData.edges?.length || 0}</div>
@@ -167,7 +247,10 @@ const ImageSimilarityExplorer = () => {
             <pre>{JSON.stringify(debugData.edges[0], null, 2)}</pre>
           </div>
         )}
-        <button onClick={() => setDebugData(null)} style={{ marginTop: '10px', padding: '5px' }}>
+        <button 
+          onClick={() => setDebugData(null)} 
+          style={{ marginTop: '10px', padding: '5px' }}
+        >
           Close Debug Panel
         </button>
       </div>
@@ -176,11 +259,15 @@ const ImageSimilarityExplorer = () => {
   
   return (
     <div style={{ display: 'flex', flexDirection: 'column', padding: '1rem', height: '100vh', width: '100%' }}>
-      <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '1rem' }}>Image Similarity Explorer</h1>
+      <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '1rem' }}>
+        Image Similarity Explorer
+      </h1>
       
       <div style={{ display: 'flex', alignItems: 'center', marginBottom: '1rem' }}>
         <div style={{ marginRight: '2rem' }}>
-          <p style={{ color: '#4B5563', marginBottom: '0.25rem' }}>Current center image: {getImageName(centerImage)}</p>
+          <p style={{ color: '#4B5563', marginBottom: '0.25rem' }}>
+            Current center image: {getImageName(centerImage)}
+          </p>
           <div style={{ border: '1px solid #D1D5DB', padding: '0.25rem', display: 'inline-block' }}>
             <img 
               src={`http://localhost:5001/static/${getImageName(centerImage)}?v=${Date.now()}`}
@@ -202,7 +289,9 @@ const ImageSimilarityExplorer = () => {
         
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
           <div>
-            <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151' }}>Similarity Threshold</label>
+            <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151' }}>
+              Similarity Threshold
+            </label>
             <input 
               type="range" 
               min="0.5" 
@@ -212,11 +301,15 @@ const ImageSimilarityExplorer = () => {
               onChange={(e) => setSimilarityThreshold(parseFloat(e.target.value))}
               style={{ width: '200px' }}
             />
-            <span style={{ marginLeft: '0.5rem', fontSize: '0.875rem' }}>{similarityThreshold}</span>
+            <span style={{ marginLeft: '0.5rem', fontSize: '0.875rem' }}>
+              {similarityThreshold}
+            </span>
           </div>
           
           <div>
-            <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151' }}>Max Neighbors</label>
+            <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151' }}>
+              Max Neighbors
+            </label>
             <input 
               type="range" 
               min="5" 
@@ -226,7 +319,9 @@ const ImageSimilarityExplorer = () => {
               onChange={(e) => setNeighborLimit(parseInt(e.target.value))}
               style={{ width: '200px' }}
             />
-            <span style={{ marginLeft: '0.5rem', fontSize: '0.875rem' }}>{neighborLimit}</span>
+            <span style={{ marginLeft: '0.5rem', fontSize: '0.875rem' }}>
+              {neighborLimit}
+            </span>
           </div>
           
           <button 
@@ -268,77 +363,12 @@ const ImageSimilarityExplorer = () => {
           <ForceGraph2D
             ref={graphRef}
             graphData={graphData}
-            nodeLabel={node => `${getImageName(node.path)} ${node.isCenter ? '' : `(Similarity: ${getSimilarity(node, graphData) || 'unknown'})`}`}
-            nodeColor={node => node.isCenter ? '#ff0000' : '#4285F4'}
+            nodeCanvasObject={nodeCanvasObject}
+            nodeCanvasObjectMode={() => 'after'}
+            onNodeClick={handleNodeClick}
             linkWidth={link => (link.value || 0.5) * 5}
             linkColor={() => '#999999'}
             linkOpacity={0.6}
-            onNodeClick={handleNodeClick}
-            nodeCanvasObject={(node, ctx, globalScale) => {
-              // Draw images as nodes
-              const size = node.isCenter ? 40 : 24;
-              
-              // Try to get the image from cache
-              const img = imagesCache.current[node.path];
-              
-              if (img) {
-                // Draw circle background
-                ctx.beginPath();
-                ctx.arc(node.x, node.y, size, 0, 2 * Math.PI);
-                ctx.fillStyle = node.isCenter ? 'rgba(255, 0, 0, 0.2)' : 'rgba(0, 0, 0, 0.2)';
-                ctx.fill();
-                
-                // Draw image clipped in circle
-                ctx.save();
-                ctx.beginPath();
-                ctx.arc(node.x, node.y, size - 2, 0, 2 * Math.PI);
-                ctx.clip();
-                ctx.drawImage(img, node.x - size + 2, node.y - size + 2, (size - 2) * 2, (size - 2) * 2);
-                ctx.restore();
-                
-                // Add border
-                ctx.beginPath();
-                ctx.arc(node.x, node.y, size, 0, 2 * Math.PI);
-                ctx.strokeStyle = node.isCenter ? '#ff0000' : '#4285F4';
-                ctx.lineWidth = 2;
-                ctx.stroke();
-              } else {
-                // Fallback for images that failed to load
-                ctx.beginPath();
-                ctx.arc(node.x, node.y, size, 0, 2 * Math.PI);
-                ctx.fillStyle = node.isCenter ? '#ff6666' : '#6699cc';
-                ctx.fill();
-                
-                ctx.beginPath();
-                ctx.arc(node.x, node.y, size, 0, 2 * Math.PI);
-                ctx.strokeStyle = node.isCenter ? '#cc0000' : '#336699';
-                ctx.lineWidth = 2;
-                ctx.stroke();
-                
-                // Add label inside node
-                ctx.font = '8px Sans-Serif';
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                ctx.fillStyle = 'white';
-                const shortName = getImageName(node.path).substring(0, 6) + '...';
-                ctx.fillText(shortName, node.x, node.y);
-                
-                // Try to load the image again
-                preloadImage(node.path).catch(() => {});
-              }
-              
-              // Add similarity text if not center node
-              if (!node.isCenter) {
-                const similarity = getSimilarity(node, graphData);
-                if (similarity) {
-                  ctx.font = '10px Sans-Serif';
-                  ctx.textAlign = 'center';
-                  ctx.textBaseline = 'bottom';
-                  ctx.fillStyle = 'black';
-                  ctx.fillText(`${(similarity * 100).toFixed(0)}%`, node.x, node.y + size + 10);
-                }
-              }
-            }}
             cooldownTicks={100}
             d3AlphaDecay={0.02}
             d3VelocityDecay={0.3}
@@ -347,20 +377,6 @@ const ImageSimilarityExplorer = () => {
       </div>
     </div>
   );
-};
-
-// Helper function to get similarity value for a node
-const getSimilarity = (node, graphData) => {
-  if (node.isCenter) return 1;
-  
-  const link = graphData.links.find(link => {
-    if (typeof link.source === 'object' && typeof link.target === 'object') {
-      return (link.source.id === node.id || link.target.id === node.id);
-    }
-    return (link.source === node.id || link.target === node.id);
-  });
-  
-  return link ? link.value : null;
 };
 
 export default ImageSimilarityExplorer;
