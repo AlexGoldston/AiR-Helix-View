@@ -1,0 +1,67 @@
+2025-03-01 21:48:12,622 - INFO - Basic logging initialized
+2025-03-01 21:48:17,195 - INFO - Starting main function
+2025-03-01 21:48:17,207 - INFO - Generated placeholder image at placeholder.png
+2025-03-01 21:48:17,209 - INFO - Available images in C:\Users\alexa\dev\AiR-Helix-View\frontend\public\images
+2025-03-01 21:48:17,212 - INFO - Total images found: 123
+2025-03-01 21:48:17,214 - INFO - Attempting to connect to Neo4j at bolt://localhost:7687
+2025-03-01 21:48:17,214 - INFO - Username: neo4j
+2025-03-01 21:48:19,283 - INFO - Successfully connected to Neo4j!
+2025-03-01 21:48:19,284 - INFO - Connected to Neo4j database
+2025-03-01 21:48:19,284 - INFO - Database connection verified
+2025-03-01 21:48:19,301 - INFO - Current image nodes in database: 0
+2025-03-01 21:48:19,302 - INFO - Database is empty. Use admin panel to populate it.
+2025-03-01 21:48:19,310 - INFO - Starting Flask application...
+2025-03-01 21:48:19,330 - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:5001
+2025-03-01 21:48:19,331 - INFO - [33mPress CTRL+C to quit[0m
+2025-03-01 21:48:19,442 - INFO -  * Restarting with stat
+2025-03-01 21:48:19,770 - INFO - Basic logging initialized
+2025-03-01 21:48:25,691 - INFO - Starting main function
+2025-03-01 21:48:25,712 - INFO - Generated placeholder image at placeholder.png
+2025-03-01 21:48:25,713 - INFO - Available images in C:\Users\alexa\dev\AiR-Helix-View\frontend\public\images
+2025-03-01 21:48:25,721 - INFO - Total images found: 123
+2025-03-01 21:48:25,724 - INFO - Attempting to connect to Neo4j at bolt://localhost:7687
+2025-03-01 21:48:25,724 - INFO - Username: neo4j
+2025-03-01 21:48:27,805 - INFO - Successfully connected to Neo4j!
+2025-03-01 21:48:27,805 - INFO - Connected to Neo4j database
+2025-03-01 21:48:27,806 - INFO - Database connection verified
+2025-03-01 21:48:27,824 - INFO - Current image nodes in database: 0
+2025-03-01 21:48:27,824 - INFO - Database is empty. Use admin panel to populate it.
+2025-03-01 21:48:27,834 - INFO - Starting Flask application...
+2025-03-01 21:48:27,845 - WARNING -  * Debugger is active!
+2025-03-01 21:48:27,857 - INFO -  * Debugger PIN: 128-764-036
+2025-03-01 21:48:32,091 - INFO - 127.0.0.1 - - [01/Mar/2025 21:48:32] "GET /admin HTTP/1.1" 200 -
+2025-03-01 21:52:35,790 - INFO -  * Restarting with stat
+2025-03-01 21:53:59,468 - INFO - Basic logging initialized
+2025-03-01 21:54:04,950 - INFO - Starting main function
+2025-03-01 21:54:04,972 - INFO - Generated placeholder image at placeholder.png
+2025-03-01 21:54:04,973 - INFO - Available images in C:\Users\alexa\dev\AiR-Helix-View\frontend\public\images
+2025-03-01 21:54:04,979 - INFO - Total images found: 123
+2025-03-01 21:54:04,982 - INFO - Attempting to connect to Neo4j at bolt://localhost:7687
+2025-03-01 21:54:04,982 - INFO - Username: neo4j
+2025-03-01 21:54:07,040 - INFO - Successfully connected to Neo4j!
+2025-03-01 21:54:07,041 - INFO - Connected to Neo4j database
+2025-03-01 21:54:07,041 - INFO - Database connection verified
+2025-03-01 21:54:07,055 - INFO - Current image nodes in database: 0
+2025-03-01 21:54:07,055 - INFO - Database is empty. Use admin panel to populate it.
+2025-03-01 21:54:07,063 - INFO - Starting Flask application...
+2025-03-01 21:54:07,087 - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:5001
+2025-03-01 21:54:07,089 - INFO - [33mPress CTRL+C to quit[0m
+2025-03-01 21:54:07,207 - INFO -  * Restarting with stat
+2025-03-01 21:54:07,524 - INFO - Basic logging initialized
+2025-03-01 21:54:13,008 - INFO - Starting main function
+2025-03-01 21:54:13,026 - INFO - Generated placeholder image at placeholder.png
+2025-03-01 21:54:13,027 - INFO - Available images in C:\Users\alexa\dev\AiR-Helix-View\frontend\public\images
+2025-03-01 21:54:13,032 - INFO - Total images found: 123
+2025-03-01 21:54:13,034 - INFO - Attempting to connect to Neo4j at bolt://localhost:7687
+2025-03-01 21:54:13,034 - INFO - Username: neo4j
+2025-03-01 21:54:15,101 - INFO - Successfully connected to Neo4j!
+2025-03-01 21:54:15,103 - INFO - Connected to Neo4j database
+2025-03-01 21:54:15,104 - INFO - Database connection verified
+2025-03-01 21:54:15,115 - INFO - Current image nodes in database: 0
+2025-03-01 21:54:15,116 - INFO - Database is empty. Use admin panel to populate it.
+2025-03-01 21:54:15,121 - INFO - Starting Flask application...
+2025-03-01 21:54:15,208 - WARNING -  * Debugger is active!
+2025-03-01 21:54:15,213 - INFO -  * Debugger PIN: 128-764-036
+2025-03-01 21:54:23,123 - INFO - 127.0.0.1 - - [01/Mar/2025 21:54:23] "GET /admin HTTP/1.1" 200 -
