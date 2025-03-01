@@ -69,6 +69,18 @@ class Neo4jConnection:
     
     @staticmethod
     def _get_neighbors_tx(tx, image_path, similarity_threshold, limit):
+        # First, get the center node details
+        center_query = "MATCH (i:Image {path: $image_path}) RETURN i"
+        center_result = tx.run(center_query, image_path=image_path)
+        center_record = center_result.single()
+        
+        if not center_record:
+            return {"nodes": [], "edges": []}
+            
+        center_node = center_record["i"]
+        center_id = str(center_node.element_id)
+        
+        # Then get neighbors
         query = (
             """
             MATCH (i:Image {path: $image_path})-[r:SIMILAR_TO]->(n:Image)
@@ -79,20 +91,32 @@ class Neo4jConnection:
             """
         )
         result = tx.run(query, image_path=image_path, similarity_threshold=similarity_threshold, limit=limit)
-        #format result for front end
-        nodes = []
+        
+        # Format result for front end
+        nodes = [{"id": center_id, "label": center_node["path"], "path": center_node["path"], "isCenter": True}]
         edges = []
+        
         for record in result:
             neighbor = record["n"]
             relationship = record["r"]
-            nodes.append({"id": str(neighbor.element_id), "label": neighbor["path"], "path": neighbor["path"]}) #str the id for react-sigma
-            edges.append({"id": str(relationship.element_id), "source": str(neighbor.element_id), "target": str(neighbor.element_id), "weight": relationship["similarity"]}) #str the ids for react-sigma
+            neighbor_id = str(neighbor.element_id)
+            
+            nodes.append({
+                "id": neighbor_id, 
+                "label": neighbor["path"], 
+                "path": neighbor["path"]
+            })
+            
+            # Fix: Correct the edge source and target
+            edges.append({
+                "id": str(relationship.element_id), 
+                "source": center_id,  # Center node is the source
+                "target": neighbor_id,  # Neighbor is the target
+                "weight": relationship["similarity"]
+            })
+            
         return {"nodes": nodes, "edges": edges}
     
-    def clear_database(self):
-        with self.driver.session() as session:
-            session.execute_write(self._clear_database_tx)
-
     @staticmethod
     def _clear_database_tx(tx):
         tx.run("MATCH (n) DETACH DELETE n")
