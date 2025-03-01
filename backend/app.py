@@ -1,4 +1,4 @@
-from flask import Flask
+from flask import Flask, send_from_directory
 from flask_cors import CORS
 import os
 import glob
@@ -32,39 +32,17 @@ logging.basicConfig(
 logger = logging.getLogger('image-similarity')
 logger.info("Basic logging initialized")
 
-# Import graph last since it might be slow
-print("Importing graph module...")
-try:
-    from graph import populate_graph
-    print("Graph module imported successfully")
-except Exception as e:
-    print(f"Error importing graph module: {e}")
-    logger.error(f"Error importing graph module: {e}")
-    traceback.print_exc()
-
-def run_with_timeout(func, args=None, kwargs=None, timeout=10):
-    """Run a function with a timeout to prevent hanging"""
-    if args is None:
-        args = []
-    if kwargs is None:
-        kwargs = {}
-    
-    with ThreadPoolExecutor(max_workers=1) as executor:
-        future = executor.submit(func, *args, **kwargs)
-        try:
-            return future.result(timeout=timeout)
-        except TimeoutError:
-            print(f"Function {func.__name__} timed out after {timeout} seconds")
-            logger.error(f"Function {func.__name__} timed out after {timeout} seconds")
-            return None
-
 def create_app():
     """Create and configure the Flask application"""
     try:
         print("Creating Flask app...")
         
         # Create Flask app
-        app = Flask(__name__, template_folder='templates')
+        app = Flask(__name__, 
+                    template_folder='templates', 
+                    static_folder=os.path.join('..', 'frontend', 'public', 'images'),
+                    static_url_path='/static')
+        
         CORS(app, supports_credentials=True, resources={r"/*": {"origins": "*"}})
         
         # Register blueprints
@@ -72,6 +50,20 @@ def create_app():
         app.register_blueprint(admin_bp)
         app.register_blueprint(api_bp)
         app.register_blueprint(static_bp)
+        
+        # Additional static file route as a fallback
+        @app.route('/static/<path:filename>')
+        def serve_static(filename):
+            """Serve static files from the images directory"""
+            logger.info(f"Attempting to serve static file: {filename}")
+            try:
+                return send_from_directory(
+                    os.path.join('..', 'frontend', 'public', 'images'), 
+                    filename
+                )
+            except Exception as e:
+                logger.error(f"Error serving static file {filename}: {e}")
+                return f"File not found: {filename}", 404
         
         # Detailed error handler
         @app.errorhandler(Exception)
@@ -101,50 +93,7 @@ def main():
         
         # Create a placeholder image at startup - this should be quick
         print("Creating placeholder image...")
-        run_with_timeout(save_placeholder_image, timeout=5)
-        
-        # Check for image directory
-        print(f"Checking image directory: {IMAGES_DIR}")
-        if os.path.exists(IMAGES_DIR):
-            logger.info(f"Available images in {IMAGES_DIR}")
-            
-            # Quick count of images instead of detailed listing
-            image_count = 0
-            for ext in IMAGE_EXTENSIONS:
-                files = glob.glob(os.path.join(IMAGES_DIR, ext))
-                image_count += len(files)
-            
-            logger.info(f"Total images found: {image_count}")
-        else:
-            logger.warning(f"WARNING: Image directory '{IMAGES_DIR}' not found")
-        
-        # Attempt to import and verify database connection
-        print("Attempting to connect to database...")
-        db = None
-        try:
-            from database import get_db_connection
-            print("Getting database connection...")
-            # Set a timeout for database connection to avoid hanging
-            db = run_with_timeout(get_db_connection, timeout=10)
-            
-            if db:
-                logger.info("Database connection verified")
-                
-                # Don't populate the graph on startup - it's too slow
-                # Instead inform the user they need to do it manually
-                image_count = db.count_images()
-                logger.info(f"Current image nodes in database: {image_count}")
-                
-                if image_count == 0:
-                    print("Database is empty. You can populate it from the admin panel.")
-                    logger.info("Database is empty. Use admin panel to populate it.")
-            else:
-                print("Database connection timed out - proceeding with limited functionality")
-                logger.warning("Database connection timed out - proceeding with limited functionality")
-        except Exception as db_error:
-            print(f"Database connection failed: {db_error}")
-            logger.error(f"Database connection failed: {db_error}")
-            traceback.print_exc()
+        save_placeholder_image()
         
         # Start the application
         print("Creating Flask application...")

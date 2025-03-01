@@ -1,12 +1,16 @@
-from flask import Blueprint, send_from_directory, redirect, url_for
+from flask import Blueprint, send_from_directory, redirect, url_for, request
 import os
 import logging
+import traceback
 from utils.image_utils import normalize_image_path, image_exists, save_placeholder_image
 from utils.image_utils import MISSING_IMAGE_CACHE
 from config import IMAGES_DIR
 
 logger = logging.getLogger('image-similarity')
 static_bp = Blueprint('static', __name__)
+
+# Use the exact frontend/public/images path
+FRONTEND_IMAGES_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'frontend', 'public', 'images'))
 
 @static_bp.route('/placeholder')
 def placeholder_image():
@@ -39,12 +43,18 @@ def placeholder_image():
 @static_bp.route('/static/<path:filename>')
 def serve_image(filename):
     """Serve static image files"""
-    # Clean up filename and remove any path components
+    # Log the entire request for debugging
+    logger.info("IMAGE REQUEST DETAILS:")
+    logger.info(f"Full request URL: {request.url}")
+    logger.info(f"Request method: {request.method}")
+    
+    # Clean up filename and remove any path components or query parameters
+    original_filename = filename
     filename = normalize_image_path(filename)
     
-    # Log the request at debug level
-    logger.debug(f"Image request for: {filename}")
-    logger.debug(f"Looking in directory: {IMAGES_DIR}")
+    logger.info(f"Original filename: {original_filename}")
+    logger.info(f"Normalized filename: {filename}")
+    logger.info(f"Frontend Images directory: {FRONTEND_IMAGES_DIR}")
     
     # Security check to prevent directory traversal
     if '..' in filename or filename.startswith('/'):
@@ -53,83 +63,73 @@ def serve_image(filename):
     
     # Skip cache check and logging for images we know don't exist
     if filename in MISSING_IMAGE_CACHE:
-        logger.debug(f"Serving placeholder for known missing image: {filename}")
+        logger.info(f"Serving placeholder for known missing image: {filename}")
         return redirect('/placeholder', code=302)
     
     # Look for the file with case-insensitive matching
     real_filename = None
-    full_path = os.path.join(IMAGES_DIR, filename)
-    logger.debug(f"Attempting to find image: {filename}")
-    logger.debug(f"Images directory being searched: {IMAGES_DIR}")
+    full_path = os.path.join(FRONTEND_IMAGES_DIR, filename)
     
     # Check if file exists directly
     if os.path.exists(full_path) and os.path.isfile(full_path):
         real_filename = filename
-        logger.debug(f"Found exact match: {filename}")
+        logger.info(f"Found exact match: {filename}")
     else:
         # Try to find the file with case-insensitive matching
         try:
-            # List directory contents and print for debugging
-            try:
-                dir_contents = os.listdir(IMAGES_DIR)
-                logger.debug(f"Directory contents: {dir_contents}")
-            except Exception as list_error:
-                logger.error(f"Error listing directory contents: {list_error}")
-                dir_contents = []
-            
-            # Case-insensitive search
-            for f in dir_contents:
+            directory_files = os.listdir(FRONTEND_IMAGES_DIR)
+            for f in directory_files:
                 if f.lower() == filename.lower():
                     real_filename = f
-                    logger.debug(f"Found case-insensitive match: {f}")
+                    logger.info(f"Found case-insensitive match: {f}")
                     break
         except Exception as e:
-            logger.error(f"Error searching directory {IMAGES_DIR}: {e}")
+            logger.error(f"Error searching directory {FRONTEND_IMAGES_DIR}: {e}")
     
     if not real_filename:
-        # Attempt to search in subdirectories
+        # Log very detailed error information
+        logger.error(f"IMAGE NOT FOUND: {filename}")
+        logger.error(f"Full attempted path: {full_path}")
+        logger.error(f"Absolute images directory: {os.path.abspath(FRONTEND_IMAGES_DIR)}")
+        logger.error(f"Current working directory: {os.getcwd()}")
+        
+        # Try to list all files again with absolute paths
         try:
-            # Use os.walk to recursively search all subdirectories
-            for root, dirs, files in os.walk(IMAGES_DIR):
+            logger.error("Absolute paths of files:")
+            for root, dirs, files in os.walk(FRONTEND_IMAGES_DIR):
                 for f in files:
-                    if f.lower() == filename.lower():
-                        real_filename = f
-                        logger.debug(f"Found image in subdirectory: {f}")
-                        break
-                if real_filename:
-                    break
-        except Exception as walk_error:
-            logger.error(f"Error walking directory {IMAGES_DIR}: {walk_error}")
-    
-    if not real_filename:
-        # Only log the first occurrence of each missing image
-        if filename not in MISSING_IMAGE_CACHE:
-            logger.warning(f"Image not found: {filename}")
-            logger.warning(f"Images directory: {IMAGES_DIR}")
-            logger.warning(f"Absolute path attempted: {os.path.abspath(full_path)}")
-            
-            # Print directory contents for debugging
-            try:
-                logger.warning(f"Directory contents: {os.listdir(IMAGES_DIR)}")
-            except Exception as list_error:
-                logger.warning(f"Could not list directory contents: {list_error}")
-            
-            # Add to cache to avoid repeat logging
-            MISSING_IMAGE_CACHE.add(filename)
+                    logger.error(f" - {os.path.join(root, f)}")
+        except Exception as list_error:
+            logger.error(f"Could not list files: {list_error}")
+        
+        # Add to cache to avoid repeat logging
+        MISSING_IMAGE_CACHE.add(filename)
+        
+        # Detailed error with traceback
+        try:
+            logger.error("Full traceback:", exc_info=True)
+        except Exception:
+            pass
         
         # Redirect to placeholder
         return redirect('/placeholder', code=302)
     
-    # Log successful requests at debug level
-    logger.debug(f"Serving image: {real_filename} from {IMAGES_DIR}")
+    # Log successful file serving details
+    log_path = os.path.join(FRONTEND_IMAGES_DIR, real_filename)
+    logger.info(f"Serving image: {real_filename}")
+    logger.info(f"Full image path: {log_path}")
+    logger.info(f"Image file exists: {os.path.exists(log_path)}")
+    logger.info(f"Is file: {os.path.isfile(log_path)}")
     
     # Set cache control to prevent caching issues
     try:
-        response = send_from_directory(IMAGES_DIR, real_filename)
+        response = send_from_directory(FRONTEND_IMAGES_DIR, real_filename)
         response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
         response.headers['Pragma'] = 'no-cache'
         response.headers['Expires'] = '0'
         return response
     except Exception as e:
-        logger.error(f"Error serving {real_filename} from {IMAGES_DIR}: {e}")
+        logger.error(f"Error serving {real_filename} from {FRONTEND_IMAGES_DIR}: {e}")
+        # Log full traceback
+        logger.error("Full traceback:", exc_info=True)
         return redirect('/placeholder', code=302)

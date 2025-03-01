@@ -24,6 +24,9 @@ const ImageSimilarityExplorer = () => {
       filename = filename.substring(7);
     }
     
+    // Remove query parameters
+    filename = filename.split('?')[0];
+    
     // Get just the filename
     return filename.split('/').pop().split('\\').pop();
   };
@@ -46,7 +49,9 @@ const ImageSimilarityExplorer = () => {
         console.error(`Failed to load image: ${path} (${filename})`, err);
         reject(err);
       };
-      img.src = `http://localhost:5001/static/${filename}?v=${Date.now()}`;
+      
+      // Use clean filename without query parameters
+      img.src = `http://localhost:5001/static/${filename}`;
     });
   };
   
@@ -250,7 +255,7 @@ const ImageSimilarityExplorer = () => {
             boxShadow: '0 4px 6px rgba(0, 0, 0, 0.2)'
           }}>
             <img 
-              src={`http://localhost:5001/static/${getImageName(centerImage)}?v=${Date.now()}`}
+              src={`http://localhost:5001/static/${getImageName(centerImage)}`}
               alt={getImageName(centerImage)}
               style={{ 
                 width: '200px', 
@@ -422,7 +427,7 @@ const ImageSimilarityExplorer = () => {
               if (img) {
                 // Draw circle background
                 ctx.beginPath();
-                ctx.arc(node.x, node.y,size, 0, 2 * Math.PI);
+                ctx.arc(node.x, node.y, size, 0, 2 * Math.PI);
                 ctx.fillStyle = node.isCenter ? 'rgba(255, 107, 107, 0.2)' : 'rgba(66, 133, 244, 0.2)';
                 ctx.fill();
                 

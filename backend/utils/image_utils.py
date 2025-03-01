@@ -15,6 +15,9 @@ def normalize_image_path(path):
     if path is None:
         return None
     
+    # Remove any query parameters (like ?v=timestamp)
+    path = path.split('?')[0]
+    
     # Remove any "images/" prefix
     if path.startswith('images/'):
         path = path[7:]  # Remove "images/" prefix
@@ -24,30 +27,42 @@ def normalize_image_path(path):
 
 def image_exists(filename):
     """Check if an image exists in the images directory"""
+    # Log the existence check for debugging
+    logger.info(f"CHECKING IMAGE EXISTENCE:")
+    logger.info(f"Filename: {filename}")
+    logger.info(f"Images directory: {IMAGES_DIR}")
+    
     if filename in IMAGE_EXISTENCE_CACHE:
+        logger.info(f"Returning cached result for {filename}")
         return IMAGE_EXISTENCE_CACHE[filename]
         
     # Check direct match
     full_path = os.path.join(IMAGES_DIR, filename)
+    
+    # Extensive logging
+    logger.info(f"Checking full path: {full_path}")
+    logger.info(f"Path exists: {os.path.exists(full_path)}")
+    logger.info(f"Is file: {os.path.isfile(full_path) if os.path.exists(full_path) else 'N/A'}")
+    
+    # Try case-sensitive first
     exists = os.path.exists(full_path) and os.path.isfile(full_path)
     
-    # Log the check for debugging
-    logger.debug(f"Checking image existence: {filename} at {full_path} -> {exists}")
-    
+    # If not found, try case-insensitive
     if not exists:
-        # Try case-insensitive matching
         try:
             directory_files = os.listdir(IMAGES_DIR)
             for f in directory_files:
                 if f.lower() == filename.lower():
                     exists = True
-                    logger.debug(f"Found case-insensitive match: {f}")
+                    logger.info(f"Found case-insensitive match: {f}")
                     break
         except Exception as e:
             logger.error(f"Error checking file existence: {e}")
     
     # Cache the result
     IMAGE_EXISTENCE_CACHE[filename] = exists
+    
+    logger.info(f"Final existence result for {filename}: {exists}")
     return exists
 
 def clear_image_caches():
