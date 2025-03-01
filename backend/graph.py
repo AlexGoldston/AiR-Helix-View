@@ -75,10 +75,13 @@ class Neo4jConnection:
         center_record = center_result.single()
         
         if not center_record:
+            print(f"Center node not found for path: {image_path}")
             return {"nodes": [], "edges": []}
             
         center_node = center_record["i"]
         center_id = str(center_node.element_id)
+        
+        print(f"Found center node: {center_node['path']} with ID: {center_id}")
         
         # Then get neighbors
         query = (
@@ -96,16 +99,22 @@ class Neo4jConnection:
         nodes = [{"id": center_id, "label": center_node["path"], "path": center_node["path"], "isCenter": True}]
         edges = []
         
+        # Track processed nodes to avoid duplicates
+        processed_nodes = {center_id}
+        
         for record in result:
             neighbor = record["n"]
             relationship = record["r"]
             neighbor_id = str(neighbor.element_id)
             
-            nodes.append({
-                "id": neighbor_id, 
-                "label": neighbor["path"], 
-                "path": neighbor["path"]
-            })
+            # Only add node if not already processed
+            if neighbor_id not in processed_nodes:
+                nodes.append({
+                    "id": neighbor_id, 
+                    "label": neighbor["path"], 
+                    "path": neighbor["path"]
+                })
+                processed_nodes.add(neighbor_id)
             
             # Fix: Correct the edge source and target
             edges.append({
@@ -114,9 +123,10 @@ class Neo4jConnection:
                 "target": neighbor_id,  # Neighbor is the target
                 "weight": relationship["similarity"]
             })
-            
-        return {"nodes": nodes, "edges": edges}
-    
+        
+        print(f"Returning {len(nodes)} nodes and {len(edges)} edges")
+        
+        return {"nodes": nodes, "edges": edges}    
     @staticmethod
     def _clear_database_tx(tx):
         tx.run("MATCH (n) DETACH DELETE n")
@@ -151,4 +161,4 @@ def populate_graph(image_dir, similarity_threshold=0.7):
     print("Graph populated.")
 
 if __name__ == '__main__':
-    populate_graph('images')
+    populate_graph('frontend\public\images')
