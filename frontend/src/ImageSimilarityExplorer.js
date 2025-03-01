@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ForceGraph2D } from 'react-force-graph';
+import ForceGraph2D from 'react-force-graph-2d';
 import _ from 'lodash';
 
 const ImageSimilarityExplorer = () => {
@@ -85,18 +85,18 @@ const ImageSimilarityExplorer = () => {
             <img 
               src={`http://localhost:5001/static/${getImageName(centerImage)}`}
               alt={getImageName(centerImage)}
-              className="w-48 h-32 object-cover"
+              style={{ width: '200px', height: '120px', objectFit: 'cover' }}
               onError={(e) => {
                 e.target.onerror = null; 
-                e.target.src = "/api/placeholder/200/120";
+                e.target.src = "https://via.placeholder.com/200x120";
               }}
             />
           </div>
         </div>
         
-        <div className="flex flex-col space-y-2">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
           <div>
-            <label className="block text-sm font-medium text-gray-700">Similarity Threshold</label>
+            <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: '#374151' }}>Similarity Threshold</label>
             <input 
               type="range" 
               min="0.5" 
@@ -104,13 +104,13 @@ const ImageSimilarityExplorer = () => {
               step="0.01" 
               value={similarityThreshold}
               onChange={(e) => setSimilarityThreshold(e.target.value)}
-              className="w-48"
+              style={{ width: '200px' }}
             />
-            <span className="ml-2 text-sm">{similarityThreshold}</span>
+            <span style={{ marginLeft: '8px', fontSize: '14px' }}>{similarityThreshold}</span>
           </div>
           
           <div>
-            <label className="block text-sm font-medium text-gray-700">Max Neighbors</label>
+            <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: '#374151' }}>Max Neighbors</label>
             <input 
               type="range" 
               min="5" 
@@ -118,17 +118,17 @@ const ImageSimilarityExplorer = () => {
               step="5" 
               value={neighborLimit}
               onChange={(e) => setNeighborLimit(e.target.value)}
-              className="w-48"
+              style={{ width: '200px' }}
             />
-            <span className="ml-2 text-sm">{neighborLimit}</span>
+            <span style={{ marginLeft: '8px', fontSize: '14px' }}>{neighborLimit}</span>
           </div>
         </div>
       </div>
       
-      {loading && <div className="text-center py-4">Loading image graph data...</div>}
-      {error && <div className="text-red-500 py-4">Error: {error}</div>}
+      {loading && <div style={{ textAlign: 'center', padding: '16px 0' }}>Loading image graph data...</div>}
+      {error && <div style={{ color: '#EF4444', padding: '16px 0' }}>Error: {error}</div>}
       
-      <div className="flex-1 border border-gray-300 rounded-lg overflow-hidden">
+      <div style={{ flex: 1, border: '1px solid #D1D5DB', borderRadius: '8px', overflow: 'hidden' }}>
         <ForceGraph2D
           graphData={graphData}
           nodeLabel={node => `${getImageName(node.path)} ${node.isCenter ? '' : `(Similarity: ${getSimilarity(node, graphData)})`}`}
@@ -145,7 +145,7 @@ const ImageSimilarityExplorer = () => {
             // Load actual image from server
             img.src = `http://localhost:5001/static/${getImageName(node.path)}`;
             img.onerror = () => {
-              img.src = "/api/placeholder/120/80";
+              img.src = "https://via.placeholder.com/120x80";
             };
             
             ctx.beginPath();
