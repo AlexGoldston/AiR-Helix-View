@@ -16,5 +16,5 @@ current state
 ---
 
 for admin tasks, while backend running goto:
-```/admin```
+```http://127.0.0.1:5001/admin```
 ![alt text](image.png)
