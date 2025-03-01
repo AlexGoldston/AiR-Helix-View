@@ -59,6 +59,101 @@ class Neo4jConnection:
             record = result.single()
             return record["i"]["path"] if record else None
     
+    def get_neighbors(self, image_path, similarity_threshold, limit):
+        """
+        Get similar image nodes and relationships based on similarity
+        
+        Args:
+            image_path: Path to the center image
+            similarity_threshold: Minimum similarity score to include (0.0-1.0)
+            limit: Maximum number of neighbors to return
+            
+        Returns:
+            Dict containing nodes and edges for graph visualization
+        """
+        logger.info(f"Fetching neighbors for {image_path} with threshold {similarity_threshold} and limit {limit}")
+        
+        # Initialize empty result
+        result = {
+            'nodes': [],
+            'edges': []
+        }
+        
+        try:
+            with self.driver.session() as session:
+                # First find the center node
+                center_node_query = """
+                MATCH (center:Image {path: $image_path})
+                RETURN id(center) as id, center.path as path
+                """
+                
+                center_node_result = session.run(center_node_query, image_path=image_path)
+                center_node_record = center_node_result.single()
+                
+                if not center_node_record:
+                    logger.warning(f"Center node not found with path: {image_path}")
+                    return result
+                    
+                # Get center node details
+                center_id = center_node_record['id']
+                center_path = center_node_record['path']
+                
+                # Add center node to result
+                result['nodes'].append({
+                    'id': str(center_id),
+                    'path': center_path,
+                    'isCenter': True
+                })
+                
+                # Find similar nodes connected to center node
+                neighbors_query = """
+                MATCH (center:Image {path: $image_path})-[r:SIMILAR_TO]-(neighbor:Image)
+                WHERE r.similarity >= $threshold
+                RETURN 
+                    id(neighbor) as id, 
+                    neighbor.path as path, 
+                    r.similarity as similarity
+                ORDER BY r.similarity DESC
+                LIMIT $limit
+                """
+                
+                neighbors_result = session.run(
+                    neighbors_query, 
+                    image_path=image_path, 
+                    threshold=similarity_threshold, 
+                    limit=limit
+                )
+                
+                # Process neighbor nodes and create edges
+                edge_id = 0
+                for record in neighbors_result:
+                    neighbor_id = str(record['id'])
+                    neighbor_path = record['path']
+                    similarity = record['similarity']
+                    
+                    # Add neighbor node
+                    result['nodes'].append({
+                        'id': neighbor_id,
+                        'path': neighbor_path,
+                        'isCenter': False
+                    })
+                    
+                    # Add edge between center and neighbor
+                    result['edges'].append({
+                        'id': f"e{edge_id}",
+                        'source': str(center_id),
+                        'target': neighbor_id,
+                        'weight': similarity
+                    })
+                    edge_id += 1
+                
+                logger.info(f"Found {len(result['nodes'])-1} neighbors for {image_path}")
+                
+        except Exception as e:
+            logger.error(f"Error fetching neighbors for {image_path}: {e}")
+            
+        return result
+    
     def remove_images(self, image_paths):
         """Remove image nodes and their relationships"""
         with self.driver.session() as session:
