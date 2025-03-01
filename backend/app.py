@@ -1,5 +1,4 @@
 from flask import Flask, jsonify, request, send_from_directory
-
 from flask_cors import CORS
 from graph import Neo4jConnection
 
@@ -20,13 +19,14 @@ def get_neighbors():
     graph_data = db.get_neighbors(image_path, similarity_threshold, limit)
     return jsonify(graph_data)
 
-@app.route('/')
-def index():
-  return "Image similarity API"
-
+# Add this new route to serve static image files
 @app.route('/static/<path:filename>')
 def serve_image(filename):
     return send_from_directory('images', filename)
+
+@app.route('/')
+def index():
+  return "Image similarity API"
 
 if __name__ == '__main__':
     app.run(debug=True, port=5001)  # Run on a different port than the React app
