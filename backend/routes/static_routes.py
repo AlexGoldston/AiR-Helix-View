@@ -1,4 +1,4 @@
-from flask import Blueprint, send_from_directory, redirect
+from flask import Blueprint, send_from_directory, redirect, url_for
 import os
 import logging
 from utils.image_utils import normalize_image_path, image_exists, save_placeholder_image
@@ -20,14 +20,11 @@ def placeholder_image():
         
         if os.path.exists(placeholder_path):
             # Return the placeholder file
-            with open(placeholder_path, 'rb') as f:
-                img_data = f.read()
-                response = static_bp.response_class(
-                    response=img_data,
-                    status=200,
-                    mimetype='image/png'
-                )
-                return response
+            return send_from_directory(
+                os.path.dirname(placeholder_path),
+                os.path.basename(placeholder_path),
+                mimetype='image/png'
+            )
     except Exception as e:
         logger.error(f"Error serving placeholder: {e}")
     
@@ -45,18 +42,28 @@ def serve_image(filename):
     # Clean up filename and remove any path components
     filename = normalize_image_path(filename)
     
+    # Log the request at debug level
+    logger.debug(f"Image request for: {filename}")
+    logger.debug(f"Looking in directory: {IMAGES_DIR}")
+    
     # Security check to prevent directory traversal
     if '..' in filename or filename.startswith('/'):
+        logger.warning(f"Invalid file path requested: {filename}")
         return "Invalid file path", 400
     
     # Skip cache check and logging for images we know don't exist
     if filename in MISSING_IMAGE_CACHE:
+        logger.debug(f"Serving placeholder for known missing image: {filename}")
         return redirect('/placeholder', code=302)
     
     # Look for the file with case-insensitive matching
     real_filename = None
-    if os.path.exists(os.path.join(IMAGES_DIR, filename)):
+    full_path = os.path.join(IMAGES_DIR, filename)
+    
+    # Check if file exists directly
+    if os.path.exists(full_path) and os.path.isfile(full_path):
         real_filename = filename
+        logger.debug(f"Found exact match: {filename}")
     else:
         # Try to find the file with case-insensitive matching
         try:
@@ -66,23 +73,29 @@ def serve_image(filename):
                     logger.debug(f"Found case-insensitive match: {f}")
                     break
         except Exception as e:
-            logger.error(f"Error listing directory: {e}")
+            logger.error(f"Error listing directory {IMAGES_DIR}: {e}")
     
     if not real_filename:
         # Only log the first occurrence of each missing image
         if filename not in MISSING_IMAGE_CACHE:
-            logger.warning(f"Image not found: {filename}")
+            logger.warning(f"Image not found: {filename} in {IMAGES_DIR}")
+            logger.warning(f"Absolute path would be: {os.path.abspath(full_path)}")
+            # Add to cache to avoid repeat logging
             MISSING_IMAGE_CACHE.add(filename)
         
         # Redirect to placeholder
         return redirect('/placeholder', code=302)
-        
+    
     # Log successful requests at debug level
-    logger.debug(f"Serving image: {real_filename}")
+    logger.debug(f"Serving image: {real_filename} from {IMAGES_DIR}")
     
     # Set cache control to prevent caching issues
-    response = send_from_directory(IMAGES_DIR, real_filename)
-    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
-    response.headers['Pragma'] = 'no-cache'
-    response.headers['Expires'] = '0'
-    return response
+    try:
+        response = send_from_directory(IMAGES_DIR, real_filename)
+        response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '0'
+        return response
+    except Exception as e:
+        logger.error(f"Error serving {real_filename} from {IMAGES_DIR}: {e}")
+        return redirect('/placeholder', code=302)

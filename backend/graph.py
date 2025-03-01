@@ -365,4 +365,4 @@ def populate_graph(image_dir, similarity_threshold=0.7):
 
 if __name__ == '__main__':
     # For manual testing
-    populate_graph('images')
+    populate_graph('../frontend/public/images')

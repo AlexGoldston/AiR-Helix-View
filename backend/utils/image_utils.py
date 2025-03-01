@@ -29,17 +29,22 @@ def image_exists(filename):
         
     # Check direct match
     full_path = os.path.join(IMAGES_DIR, filename)
-    exists = os.path.exists(full_path)
+    exists = os.path.exists(full_path) and os.path.isfile(full_path)
+    
+    # Log the check for debugging
+    logger.debug(f"Checking image existence: {filename} at {full_path} -> {exists}")
     
     if not exists:
         # Try case-insensitive matching
         try:
-            for f in os.listdir(IMAGES_DIR):
+            directory_files = os.listdir(IMAGES_DIR)
+            for f in directory_files:
                 if f.lower() == filename.lower():
                     exists = True
+                    logger.debug(f"Found case-insensitive match: {f}")
                     break
-        except Exception:
-            pass
+        except Exception as e:
+            logger.error(f"Error checking file existence: {e}")
     
     # Cache the result
     IMAGE_EXISTENCE_CACHE[filename] = exists
@@ -47,19 +52,27 @@ def image_exists(filename):
 
 def clear_image_caches():
     """Clear the image existence caches"""
+    logger.info("Clearing image existence caches")
     IMAGE_EXISTENCE_CACHE.clear()
     MISSING_IMAGE_CACHE.clear()
 
 def generate_placeholder_image(color='#FF9999', size=(100, 100)):
     """Generate a base64 data URL for a placeholder image"""
     try:
-        from PIL import Image, ImageDraw
+        from PIL import Image, ImageDraw, ImageFont
         img = Image.new('RGB', size, color=color)
         draw = ImageDraw.Draw(img)
         
         # Draw a border
         border_color = '#CC0000'
         draw.rectangle([(0, 0), (size[0]-1, size[1]-1)], outline=border_color, width=4)
+        
+        # Add text (optional)
+        try:
+            draw.text((size[0]//2, size[1]//2), "No Image", fill="#FFFFFF")
+        except Exception:
+            # Text rendering failed, continue anyway
+            pass
         
         # Convert to base64
         import io
@@ -78,7 +91,7 @@ def generate_placeholder_image(color='#FF9999', size=(100, 100)):
 def save_placeholder_image(output_path='placeholder.png'):
     """Save a placeholder image file"""
     try:
-        from PIL import Image, ImageDraw
+        from PIL import Image, ImageDraw, ImageFont
         img = Image.new('RGB', (200, 120), color='#FF9999')
         draw = ImageDraw.Draw(img)
         
