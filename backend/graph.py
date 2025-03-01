@@ -4,6 +4,7 @@ import os.path as op
 from dotenv import load_dotenv
 from embeddings import ImageEmbedder
 import numpy as np
+import glob
 
 load_dotenv()
 
@@ -24,6 +25,26 @@ class Neo4jConnection:
 
     def close(self):
         self.driver.close()
+    
+    def count_images(self):
+        """Count the number of image nodes in the database"""
+        with self.driver.session() as session:
+            result = session.run("MATCH (i:Image) RETURN count(i) as count")
+            record = result.single()
+            return record["count"] if record else 0
+            
+    def get_sample_images(self, limit=10):
+        """Get a sample of image nodes from the database"""
+        with self.driver.session() as session:
+            result = session.run("MATCH (i:Image) RETURN i.path as path LIMIT $limit", limit=limit)
+            return [record["path"] for record in result]
+            
+    def find_image_by_path(self, path):
+        """Find an image node by its path"""
+        with self.driver.session() as session:
+            result = session.run("MATCH (i:Image {path: $path}) RETURN i", path=path)
+            record = result.single()
+            return record["i"]["path"] if record else None
     
     def create_image_node(self, image_path, embedding):
         with self.driver.session() as session:
@@ -126,7 +147,13 @@ class Neo4jConnection:
         
         print(f"Returning {len(nodes)} nodes and {len(edges)} edges")
         
-        return {"nodes": nodes, "edges": edges}    
+        return {"nodes": nodes, "edges": edges}
+    
+    def clear_database(self):
+        with self.driver.session() as session:
+            session.execute_write(self._clear_database_tx)
+            print("Database cleared")
+
     @staticmethod
     def _clear_database_tx(tx):
         tx.run("MATCH (n) DETACH DELETE n")
@@ -134,31 +161,64 @@ class Neo4jConnection:
 def calculate_cosine_similarity(embedding1, embedding2):
     return np.dot(embedding1, embedding2) / (np.linalg.norm(embedding1) * np.linalg.norm(embedding2))
 
+def normalize_image_path(path):
+    """Extract just the filename from any path format"""
+    if path is None:
+        return None
+    
+    # Get just the filename without any path
+    return os.path.basename(path)
+
 def populate_graph(image_dir, similarity_threshold=0.7):
+    print(f"Populating graph from {image_dir} with threshold {similarity_threshold}")
+    
     embedder = ImageEmbedder()
     db = Neo4jConnection()
     db.clear_database() #start with clean db for POC
 
-    image_paths = [op.join(image_dir, f) for f in os.listdir(image_dir) if f.endswith(('.png', '.jpg', '.jpeg'))]
+    # Find all image files recursively
+    image_paths = []
+    for ext in ['*.jpg', '*.jpeg', '*.png', '*.gif']:
+        image_paths.extend(glob.glob(os.path.join(image_dir, ext)))
+    
+    print(f"Found {len(image_paths)} images")
+    
+    if not image_paths:
+        print(f"No images found in directory: {image_dir}")
+        return
+    
     embeddings = {}
 
-    #create nodes
+    # Create nodes - store images with just the filename as the key
     for image_path in image_paths:
-        embedding = embedder.get_embedding(image_path)
-        if embedding:
-            embeddings[image_path] = embedding
-            db.create_image_node(image_path, embedding)
+        try:
+            # Get just the filename for storage in Neo4j
+            filename = normalize_image_path(image_path)
+            
+            print(f"Processing {filename}")
+            embedding = embedder.get_embedding(image_path)
+            
+            if embedding:
+                embeddings[filename] = embedding
+                db.create_image_node(filename, embedding)
+                print(f"Created node for {filename}")
+            else:
+                print(f"Failed to generate embedding for {filename}")
+        except Exception as e:
+            print(f"Error processing {image_path}: {e}")
 
-    #create relationships
-    for i, image_path1 in enumerate(image_paths):
-        for j, image_path2 in enumerate(image_paths):
+    # Create relationships
+    for i, filename1 in enumerate(embeddings.keys()):
+        for j, filename2 in enumerate(embeddings.keys()):
             if i != j: #dont compare image against itself!
-                similarity = calculate_cosine_similarity(embeddings[image_path1], embeddings[image_path2])
+                similarity = calculate_cosine_similarity(embeddings[filename1], embeddings[filename2])
                 if similarity >= similarity_threshold:
-                    db.create_similarity_relationship(image_path1, image_path2, similarity)
+                    db.create_similarity_relationship(filename1, filename2, similarity)
+                    print(f"Created relationship between {filename1} and {filename2} with similarity {similarity:.2f}")
     
+    print(f"Created {len(embeddings)} nodes with relationships")
     db.close()
     print("Graph populated.")
 
 if __name__ == '__main__':
-    populate_graph('frontend\public\images')
+    populate_graph('images')

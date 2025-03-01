@@ -3,16 +3,30 @@ import ForceGraph2D from 'react-force-graph-2d';
 
 const ImageSimilarityExplorer = () => {
   const [graphData, setGraphData] = useState({ nodes: [], links: [] });
-  const [centerImage, setCenterImage] = useState('images/allianz_stadium_sydney01.jpg');
+  const [centerImage, setCenterImage] = useState('allianz_stadium_sydney01.jpg');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [similarityThreshold, setSimilarityThreshold] = useState(0.63);
-  const [neighborLimit, setNeighborLimit] = useState(50);
+  const [neighborLimit, setNeighborLimit] = useState(20);
   const [debugData, setDebugData] = useState(null);
   
   // Ref to store preloaded images
   const imagesCache = useRef({});
   const graphRef = useRef(null);
+  
+  // Extract filename from path
+  const getImageName = (path) => {
+    if (!path) return 'unknown';
+    
+    // Remove any "images/" prefix
+    let filename = path;
+    if (filename.startsWith('images/')) {
+      filename = filename.substring(7);
+    }
+    
+    // Get just the filename
+    return filename.split('/').pop().split('\\').pop();
+  };
   
   // Preload an image and store it in cache
   const preloadImage = (path) => {
@@ -29,7 +43,7 @@ const ImageSimilarityExplorer = () => {
         resolve(img);
       };
       img.onerror = (err) => {
-        console.error(`Failed to load image: ${path}`, err);
+        console.error(`Failed to load image: ${path} (${filename})`, err);
         reject(err);
       };
       img.src = `http://localhost:5001/static/${filename}?v=${Date.now()}`;
@@ -45,8 +59,9 @@ const ImageSimilarityExplorer = () => {
       try {
         console.log(`Fetching data for ${centerImage} with threshold ${similarityThreshold} and limit ${neighborLimit}`);
         
-        // Call the backend API
-        const response = await fetch(`http://localhost:5001/neighbors?image_path=${encodeURIComponent(centerImage)}&threshold=${similarityThreshold}&limit=${neighborLimit}`);
+        // Call the backend API with just the filename
+        const filename = getImageName(centerImage);
+        const response = await fetch(`http://localhost:5001/neighbors?image_path=${encodeURIComponent(filename)}&threshold=${similarityThreshold}&limit=${neighborLimit}`);
         
         if (!response.ok) {
           throw new Error(`API error: ${response.status}`);
@@ -62,28 +77,15 @@ const ImageSimilarityExplorer = () => {
           throw new Error("Invalid data structure from API");
         }
 
-        // Initialize graph data structure with center node
-        const processedData = {
+        // Transform the API response to match ForceGraph expected format
+        const graphData = {
           nodes: [],
           links: []
         };
-
-        // Add center node if it's not already in the API response
-        const centerNodeExists = apiData.nodes.some(node => node.isCenter);
         
-        if (!centerNodeExists) {
-          // Create a center node
-          processedData.nodes.push({
-            id: 'center-node',
-            path: centerImage,
-            label: getImageName(centerImage),
-            isCenter: true
-          });
-        }
-        
-        // Add all nodes from the API response
+        // Process all nodes from the API response
         for (const node of apiData.nodes) {
-          processedData.nodes.push({
+          graphData.nodes.push({
             id: node.id,
             path: node.path,
             label: node.label || getImageName(node.path),
@@ -91,54 +93,35 @@ const ImageSimilarityExplorer = () => {
           });
         }
         
-        // Process edges from API
+        // Process all edges from the API response
         for (const edge of apiData.edges) {
-          // Check if both source and target exist
-          const sourceExists = processedData.nodes.some(n => n.id === edge.source);
-          const targetExists = processedData.nodes.some(n => n.id === edge.target);
-          
-          if (sourceExists && targetExists) {
-            processedData.links.push({
-              id: edge.id,
-              source: edge.source,
-              target: edge.target,
-              value: edge.weight
-            });
-          } else {
-            console.warn("Edge references non-existent node", edge);
-          }
+          graphData.links.push({
+            id: edge.id,
+            source: edge.source,
+            target: edge.target,
+            value: edge.weight
+          });
         }
         
-        // If center node was added but not in edges, create edges to all other nodes
-        if (!centerNodeExists && processedData.nodes.length > 1) {
-          const centerNodeId = 'center-node';
-          
-          for (const node of processedData.nodes) {
-            if (node.id !== centerNodeId) {
-              processedData.links.push({
-                id: `link-${centerNodeId}-${node.id}`,
-                source: centerNodeId,
-                target: node.id,
-                value: 0.8 // Default similarity
-              });
-            }
-          }
-        }
+        console.log("Processed graph data:", graphData);
         
-        console.log("Processed graph data:", processedData);
-        
-        // Preload images before setting graph data
-        const preloadPromises = processedData.nodes.map(node => 
+        // Preload images for better rendering
+        const preloadPromises = graphData.nodes.map(node => 
           preloadImage(node.path).catch(() => console.warn(`Failed to preload image: ${node.path}`))
         );
         
         await Promise.allSettled(preloadPromises);
-        setGraphData(processedData);
+        setGraphData(graphData);
         
+        // Adjust graph physics after setting data
         if (graphRef.current) {
-          graphRef.current.d3Force('charge').strength(-300);
-          graphRef.current.d3Force('link').distance(100);
           setTimeout(() => {
+            if (graphRef.current.d3Force('charge')) {
+              graphRef.current.d3Force('charge').strength(-300);
+            }
+            if (graphRef.current.d3Force('link')) {
+              graphRef.current.d3Force('link').distance(100);
+            }
             graphRef.current.zoomToFit(500);
           }, 500);
         }
@@ -152,12 +135,6 @@ const ImageSimilarityExplorer = () => {
     
     fetchData();
   }, [centerImage, similarityThreshold, neighborLimit]);
-  
-  // Extract filename from path
-  const getImageName = (path) => {
-    if (!path) return 'unknown';
-    return path.split('/').pop().split('\\').pop();
-  };
   
   // Handle node click to change center image
   const handleNodeClick = node => {
@@ -190,11 +167,6 @@ const ImageSimilarityExplorer = () => {
             <pre>{JSON.stringify(debugData.edges[0], null, 2)}</pre>
           </div>
         )}
-        <div>
-          <h4>Processed Graph Data:</h4>
-          <div>Nodes: {graphData.nodes.length}</div>
-          <div>Links: {graphData.links.length}</div>
-        </div>
         <button onClick={() => setDebugData(null)} style={{ marginTop: '10px', padding: '5px' }}>
           Close Debug Panel
         </button>
@@ -342,6 +314,14 @@ const ImageSimilarityExplorer = () => {
                 ctx.strokeStyle = node.isCenter ? '#cc0000' : '#336699';
                 ctx.lineWidth = 2;
                 ctx.stroke();
+                
+                // Add label inside node
+                ctx.font = '8px Sans-Serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillStyle = 'white';
+                const shortName = getImageName(node.path).substring(0, 6) + '...';
+                ctx.fillText(shortName, node.x, node.y);
                 
                 // Try to load the image again
                 preloadImage(node.path).catch(() => {});
