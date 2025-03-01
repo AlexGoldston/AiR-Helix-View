@@ -33,6 +33,12 @@ class Neo4jConnection:
             record = result.single()
             return record["count"] if record else 0
             
+    def get_all_images(self):
+        """Get all image paths from the database"""
+        with self.driver.session() as session:
+            result = session.run("MATCH (i:Image) RETURN i.path as path")
+            return [record["path"] for record in result]
+    
     def get_sample_images(self, limit=10):
         """Get a sample of image nodes from the database"""
         with self.driver.session() as session:
@@ -45,6 +51,31 @@ class Neo4jConnection:
             result = session.run("MATCH (i:Image {path: $path}) RETURN i", path=path)
             record = result.single()
             return record["i"]["path"] if record else None
+    
+    def remove_images(self, image_paths):
+        """Remove image nodes and their relationships"""
+        with self.driver.session() as session:
+            return session.execute_write(self._remove_images_tx, image_paths)
+    
+    @staticmethod
+    def _remove_images_tx(tx, image_paths):
+        # Convert to list if it's not already
+        if not isinstance(image_paths, list):
+            image_paths = [image_paths]
+            
+        # Execute the query to remove nodes and relationships
+        result = tx.run(
+            """
+            UNWIND $paths AS path
+            MATCH (i:Image {path: path})
+            DETACH DELETE i
+            RETURN count(i) as count
+            """,
+            paths=image_paths
+        )
+        
+        record = result.single()
+        return record["count"] if record else 0
     
     def create_image_node(self, image_path, embedding):
         with self.driver.session() as session:

@@ -3,6 +3,8 @@ from flask_cors import CORS
 from graph import Neo4jConnection, populate_graph
 import os
 import glob
+import json
+import base64
 
 app = Flask(__name__)
 CORS(app, supports_credentials=True, resources={r"/*": {"origins": "*"}})  # Allow all origins
@@ -35,6 +37,28 @@ if not IMAGES_DIR:
 # Initialize database connection
 db = Neo4jConnection()
 
+# Cache for image existence checks to reduce filesystem lookups
+IMAGE_EXISTENCE_CACHE = {}
+
+# Generate a small placeholder image
+def generate_placeholder_image(color='#FF9999', size=(100, 100)):
+    """Generate a base64 data URL for a placeholder image"""
+    from PIL import Image, ImageDraw
+    img = Image.new('RGB', size, color=color)
+    draw = ImageDraw.Draw(img)
+    
+    # Draw a border
+    border_color = '#CC0000'
+    draw.rectangle([(0, 0), (size[0]-1, size[1]-1)], outline=border_color, width=4)
+    
+    # Convert to base64
+    import io
+    buffer = io.BytesIO()
+    img.save(buffer, format='PNG')
+    img_str = base64.b64encode(buffer.getvalue()).decode('utf-8')
+    
+    return f"data:image/png;base64,{img_str}"
+
 # Helper function to normalize image paths
 def normalize_image_path(path):
     """Extract just the filename from any path format"""
@@ -47,6 +71,52 @@ def normalize_image_path(path):
         
     # Get just the filename without any path
     return os.path.basename(path)
+
+# Check if an image exists on disk
+def image_exists(filename):
+    """Check if an image exists in the images directory"""
+    if filename in IMAGE_EXISTENCE_CACHE:
+        return IMAGE_EXISTENCE_CACHE[filename]
+        
+    # Check direct match
+    full_path = os.path.join(IMAGES_DIR, filename)
+    exists = os.path.exists(full_path)
+    
+    if not exists:
+        # Try case-insensitive matching
+        try:
+            for f in os.listdir(IMAGES_DIR):
+                if f.lower() == filename.lower():
+                    exists = True
+                    break
+        except Exception:
+            pass
+    
+    # Cache the result
+    IMAGE_EXISTENCE_CACHE[filename] = exists
+    return exists
+
+# Endpoint to provide a placeholder image for missing images
+@app.route('/placeholder/<color>')
+def placeholder_image(color='FF9999'):
+    """Return a placeholder image for missing images"""
+    try:
+        # Clean the color input
+        color = color.strip('#')
+        if len(color) == 6:
+            color = f"#{color}"
+        else:
+            color = "#FF9999"  # Default fallback
+            
+        response = app.response_class(
+            response=generate_placeholder_image(color),
+            status=200,
+            mimetype='image/png'
+        )
+        return response
+    except Exception as e:
+        print(f"Error generating placeholder: {e}")
+        return "Error", 500
 
 # Debug endpoint to list all available images
 @app.route('/debug/images')
@@ -73,6 +143,40 @@ def list_images():
         "image_count": len(images),
         "images": images
     })
+
+# Debug endpoint to compare DB images with filesystem
+@app.route('/debug/sync')
+def debug_sync():
+    """Compare database images with filesystem images"""
+    try:
+        # Get images from database
+        db_images = db.get_all_images()
+        
+        # Get images from filesystem
+        fs_images = []
+        for ext in ['*.jpg', '*.jpeg', '*.png', '*.gif']:
+            fs_images.extend([os.path.basename(f) for f in glob.glob(os.path.join(IMAGES_DIR, ext))])
+            fs_images.extend([os.path.basename(f) for f in glob.glob(os.path.join(IMAGES_DIR, ext.upper()))])
+        
+        # Normalize all paths to just filenames
+        db_images = [normalize_image_path(img) for img in db_images]
+        fs_images = [normalize_image_path(img) for img in fs_images]
+        
+        # Find differences
+        missing_in_fs = [img for img in db_images if img not in fs_images]
+        missing_in_db = [img for img in fs_images if img not in db_images]
+        
+        return jsonify({
+            "db_image_count": len(db_images),
+            "fs_image_count": len(fs_images),
+            "missing_in_filesystem": missing_in_fs,
+            "missing_in_database": missing_in_db,
+            "sync_needed": len(missing_in_fs) > 0 or len(missing_in_db) > 0
+        })
+    except Exception as e:
+        return jsonify({
+            "error": str(e)
+        }), 500
 
 # Debug endpoint to test Neo4j connection
 @app.route('/debug/db')
@@ -142,6 +246,40 @@ def reset_db():
             "error": str(e)
         }), 500
 
+# Fix database by pruning missing image nodes
+@app.route('/admin/fix-db', methods=['POST'])
+def fix_db():
+    """Remove nodes for images that don't exist in the filesystem"""
+    try:
+        # Get all image nodes
+        image_nodes = db.get_all_images()
+        
+        # Check which ones exist in the filesystem
+        missing_nodes = []
+        for node_path in image_nodes:
+            filename = normalize_image_path(node_path)
+            if not image_exists(filename):
+                missing_nodes.append(node_path)
+        
+        # Remove missing nodes
+        if missing_nodes:
+            removed_count = db.remove_images(missing_nodes)
+            return jsonify({
+                "status": "OK",
+                "message": f"Removed {removed_count} nodes for missing images",
+                "removed_images": missing_nodes
+            })
+        else:
+            return jsonify({
+                "status": "OK",
+                "message": "No missing image nodes found"
+            })
+    except Exception as e:
+        return jsonify({
+            "status": "ERROR",
+            "error": str(e)
+        }), 500
+
 # API endpoint to get neighbors
 @app.route('/neighbors', methods=['GET'])
 def get_neighbors():
@@ -183,15 +321,35 @@ def get_neighbors():
     # Debug the output
     print(f"Returning data with {len(graph_data.get('nodes', []))} nodes and {len(graph_data.get('edges', []))} edges")
     
-    return jsonify(graph_data)
+    # Filter out nodes for images that don't exist
+    nodes_to_keep = []
+    for node in graph_data.get('nodes', []):
+        filename = normalize_image_path(node['path'])
+        if image_exists(filename) or node.get('isCenter'):
+            nodes_to_keep.append(node)
+        else:
+            print(f"Filtered out node for missing image: {filename}")
+    
+    # Update edges to only include existing nodes
+    node_ids = {node['id'] for node in nodes_to_keep}
+    edges_to_keep = []
+    for edge in graph_data.get('edges', []):
+        if edge['source'] in node_ids and edge['target'] in node_ids:
+            edges_to_keep.append(edge)
+    
+    # Return filtered data
+    filtered_data = {
+        'nodes': nodes_to_keep,
+        'edges': edges_to_keep
+    }
+    
+    return jsonify(filtered_data)
 
 # Improved static file serving with better error handling
 @app.route('/static/<path:filename>')
 def serve_image(filename):
     # Clean up filename and remove any path components
     filename = normalize_image_path(filename)
-    
-    print(f"Request for image: {filename}")
     
     # Security check to prevent directory traversal
     if '..' in filename or filename.startswith('/'):
@@ -214,12 +372,8 @@ def serve_image(filename):
     
     if not real_filename:
         print(f"Image not found: {filename}")
-        try:
-            available_files = os.listdir(IMAGES_DIR)
-            print(f"Available files in directory ({len(available_files)} total): {available_files[:10]}")
-        except Exception as e:
-            print(f"Error listing directory: {e}")
-        return "Image not found", 404
+        # Return a redirect to placeholder instead of 404
+        return app.redirect('/placeholder/FF9999')
         
     # Log successful requests
     print(f"Serving image: {real_filename} from {IMAGES_DIR}")
@@ -252,7 +406,14 @@ def admin_dashboard():
         <div class="card">
             <h2>Database Management</h2>
             <button id="resetDb">Reset Database & Repopulate</button>
+            <button id="fixDb">Fix Database (Remove Missing Images)</button>
             <div id="resetResult"></div>
+        </div>
+        
+        <div class="card">
+            <h2>Database/Filesystem Sync</h2>
+            <button id="checkSync">Check Sync Status</button>
+            <div id="syncResult"></div>
         </div>
         
         <div class="card">
@@ -281,6 +442,36 @@ def admin_dashboard():
                     } catch (error) {
                         document.getElementById('resetResult').innerHTML = `<pre>Error: ${error.message}</pre>`;
                     }
+                }
+            });
+            
+            document.getElementById('fixDb').addEventListener('click', async () => {
+                if (confirm('This will remove database nodes for images that don\\'t exist in the filesystem. Continue?')) {
+                    try {
+                        const result = document.getElementById('resetResult');
+                        result.innerHTML = 'Processing...';
+                        
+                        const response = await fetch('/admin/fix-db', { method: 'POST' });
+                        const data = await response.json();
+                        
+                        result.innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+                    } catch (error) {
+                        document.getElementById('resetResult').innerHTML = `<pre>Error: ${error.message}</pre>`;
+                    }
+                }
+            });
+            
+            document.getElementById('checkSync').addEventListener('click', async () => {
+                try {
+                    const result = document.getElementById('syncResult');
+                    result.innerHTML = 'Loading...';
+                    
+                    const response = await fetch('/debug/sync');
+                    const data = await response.json();
+                    
+                    result.innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+                } catch (error) {
+                    document.getElementById('syncResult').innerHTML = `<pre>Error: ${error.message}</pre>`;
                 }
             });
             
