@@ -154,6 +154,145 @@ class Neo4jConnection:
             
         return result
     
+    def get_extended_neighbors(self, image_path, similarity_threshold, depth=1, limit_per_level=10, max_nodes=100):
+        """
+        Get multi-level neighbor nodes for deeper graph exploration
+            
+            Args:
+                image_path: Path to the center image
+                similarity_threshold: Minimum similarity score to include (0.0-1.0)
+                depth: How many levels of neighbors to explore (1=direct neighbors only, 2=neighbors of neighbors, etc.)
+                limit_per_level: Maximum number of neighbors to fetch per node
+                max_nodes: Overall maximum nodes to return
+                
+            Returns:
+                Dict containing nodes and edges for graph visualization
+        """
+        logger.info(f"Fetching extended neighbors for {image_path} with depth {depth}")
+    
+        # Initialize result and tracking sets
+        result = {
+            'nodes': [],
+            'edges': []
+        }
+        
+        processed_nodes = set()  # Track nodes already processed
+        node_queue = [(image_path, 0)]  # (path, level) tuples for BFS
+        node_ids = {}  # Map of path to node ID
+        
+        try:
+            with self.driver.session() as session:
+                # Process nodes breadth-first up to max depth
+                while node_queue and len(result['nodes']) < max_nodes:
+                    current_path, current_level = node_queue.pop(0)
+                    
+                    # Skip if already processed
+                    if current_path in processed_nodes:
+                        continue
+                    
+                    # Mark as processed
+                    processed_nodes.add(current_path)
+                    
+                    # Find node in database
+                    node_query = """
+                    MATCH (node:Image {path: $path})
+                    RETURN id(node) as id, node.path as path
+                    """
+                    
+                    node_result = session.run(node_query, path=current_path)
+                    node_record = node_result.single()
+                    
+                    if not node_record:
+                        logger.warning(f"Node not found: {current_path}")
+                        continue
+                    
+                    # Get node details
+                    node_id = str(node_record['id'])
+                    node_path = node_record['path']
+                    
+                    # Store node ID mapping
+                    node_ids[node_path] = node_id
+                    
+                    # Add node to result (if not already there)
+                    if not any(n['id'] == node_id for n in result['nodes']):
+                        result['nodes'].append({
+                            'id': node_id,
+                            'path': node_path,
+                            'isCenter': current_path == image_path,
+                            'level': current_level
+                        })
+                    
+                    # If we've reached max depth, don't fetch neighbors
+                    if current_level >= depth:
+                        continue
+                    
+                    # Find neighbors of this node
+                    neighbors_query = """
+                    MATCH (current:Image {path: $path})-[r:SIMILAR_TO]-(neighbor:Image)
+                    WHERE r.similarity >= $threshold
+                    RETURN 
+                        id(neighbor) as id, 
+                        neighbor.path as path, 
+                        r.similarity as similarity
+                    ORDER BY r.similarity DESC
+                    LIMIT $limit
+                    """
+                    
+                    neighbors_result = session.run(
+                        neighbors_query, 
+                        path=current_path, 
+                        threshold=similarity_threshold, 
+                        limit=limit_per_level
+                    )
+                    
+                    # Process neighbors
+                    for record in neighbors_result:
+                        neighbor_id = str(record['id'])
+                        neighbor_path = record['path']
+                        similarity = record['similarity']
+                        
+                        # Store neighbor ID mapping
+                        node_ids[neighbor_path] = neighbor_id
+                        
+                        # Add neighbor to queue for next level if not processed
+                        if neighbor_path not in processed_nodes:
+                            node_queue.append((neighbor_path, current_level + 1))
+                        
+                        # Add neighbor node if not already in result
+                        if not any(n['id'] == neighbor_id for n in result['nodes']):
+                            result['nodes'].append({
+                                'id': neighbor_id,
+                                'path': neighbor_path,
+                                'isCenter': False,
+                                'level': current_level + 1
+                            })
+                        
+                        # Create unique edge ID
+                        edge_id = f"e{node_id}-{neighbor_id}"
+                        
+                        # Add edge if not already in result
+                        if not any(e['id'] == edge_id for e in result['edges']):
+                            result['edges'].append({
+                                'id': edge_id,
+                                'source': node_id,
+                                'target': neighbor_id,
+                                'weight': similarity
+                            })
+                        
+                    # Check if we've reached the max nodes
+                    if len(result['nodes']) >= max_nodes:
+                        logger.info(f"Reached max nodes limit: {max_nodes}")
+                        break
+                    
+                logger.info(f"Found {len(result['nodes'])} nodes and {len(result['edges'])} edges with depth {depth}")
+                
+        except Exception as e:
+            logger.error(f"Error fetching extended neighbors for {image_path}: {e}")
+            
+        return result
+
+
+        
     def remove_images(self, image_paths):
         """Remove image nodes and their relationships"""
         with self.driver.session() as session:
