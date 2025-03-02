@@ -5,9 +5,9 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Database configuration
-NEO4J_URI = os.getenv("NEO4J_URI", "bolt://localhost:7687")
-NEO4J_USER = os.getenv("NEO4J_USER", "neo4j")
-NEO4J_PASSWORD = os.getenv("NEO4J_PASSWORD", "devpassword")
+NEO4J_URI = os.getenv("NEO4J_URI")
+NEO4J_USER = os.getenv("NEO4J_USER")
+NEO4J_PASSWORD = os.getenv("NEO4J_PASSWORD")
 
 # Logging configuration
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
@@ -31,5 +31,5 @@ if not os.path.exists(IMAGES_DIR):
 IMAGE_EXTENSIONS = ['*.jpg', '*.jpeg', '*.png', '*.gif']
 
 # Default similarity threshold
-DEFAULT_SIMILARITY_THRESHOLD = 0.27
-DEFAULT_NEIGHBOR_LIMIT = 5
+DEFAULT_SIMILARITY_THRESHOLD = 0.5
+DEFAULT_NEIGHBOR_LIMIT = 10
