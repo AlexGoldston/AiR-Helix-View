@@ -79,8 +79,10 @@ const ImageSimilarityExplorer = () => {
     
     // Get current viewport information
     const { x, y, k } = graphRef.current.zoom();
-    const width = graphRef.current.width();
-    const height = graphRef.current.height();
+    
+    // Use window dimensions as fallback
+    const width = window.innerWidth;
+    const height = window.innerHeight;
     
     // Calculate viewport boundaries with buffer
     const bounds = {
@@ -300,13 +302,13 @@ const ImageSimilarityExplorer = () => {
         if (graphRef.current) {
           setTimeout(() => {
             if (graphRef.current.d3Force('charge')) {
-              graphRef.current.d3Force('charge').strength(-300);
+              graphRef.current.d3Force('charge').strength(-500);
             }
             if (graphRef.current.d3Force('link')) {
-              graphRef.current.d3Force('link').distance(100);
+              graphRef.current.d3Force('link').distance(150);
             }
-            graphRef.current.zoomToFit(500);
-          }, 500);
+            graphRef.current.zoomToFit(1000);
+          }, 1000);
         }
       } catch (err) {
         console.error("Error fetching graph data:", err);
