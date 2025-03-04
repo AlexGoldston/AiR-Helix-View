@@ -11,7 +11,7 @@ import logging
 logger = logging.getLogger('image-similarity')
 
 class Neo4jConnection:
-    def __init__(self):
+    def __init__(self, connection_timeout=5):
         load_dotenv()
         self.uri = os.getenv("NEO4J_URI")
         self.user = os.getenv("NEO4J_USER")
@@ -20,9 +20,14 @@ class Neo4jConnection:
         logger.info(f"Attempting to connect to Neo4j at {self.uri}")
         logger.info(f"Username: {self.user}")
         
-        self.driver = GraphDatabase.driver(self.uri, auth=(self.user, self.password))
+        # Add timeout to driver creation
+        self.driver = GraphDatabase.driver(
+            self.uri, 
+            auth=(self.user, self.password),
+            connection_timeout=connection_timeout
+        )
 
-        # Connection test
+        # Connection test with timeout
         try:
             self.driver.verify_connectivity()
             logger.info("Successfully connected to Neo4j!")

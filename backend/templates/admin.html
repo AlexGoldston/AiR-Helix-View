@@ -5,9 +5,11 @@
     <style>
         body { 
             font-family: Arial, sans-serif; 
-            max-width: 800px; 
+            max-width: 900px; 
             margin: 0 auto; 
             padding: 20px; 
+            background-color: #f8f9fa;
+            color: #333;
         }
         button { 
             padding: 10px; 
@@ -17,22 +19,29 @@
             color: white;
             border: none;
             border-radius: 4px;
+            transition: background-color 0.3s;
         }
         button:hover {
             background-color: #3367D6;
         }
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
         .card { 
-            border: 1px solid #ccc; 
+            border: 1px solid #ddd; 
             padding: 15px; 
             margin: 15px 0; 
             border-radius: 5px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            background-color: white;
         }
         pre { 
             background: #f5f5f5; 
             padding: 10px; 
             overflow: auto;
             border-radius: 4px;
+            max-height: 300px;
         }
         .logs-teaser { 
             max-height: 150px; 
@@ -50,61 +59,548 @@
             color: #5F6368;
             border-bottom: 1px solid #eee;
             padding-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-left: 8px;
+        }
+        .status-good {
+            background-color: #34A853;
+        }
+        .status-warning {
+            background-color: #FBBC05;
+        }
+        .status-error {
+            background-color: #EA4335;
+        }
+        .status-unknown {
+            background-color: #9AA0A6;
+        }
+        .control-row {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+            flex-wrap: wrap;
+        }
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(0, 0, 0, 0.1);
+            border-radius: 50%;
+            border-top-color: #4285F4;
+            animation: spin 1s ease-in-out infinite;
+            vertical-align: middle;
+            margin-right: 8px;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: bold;
+            margin-left: 8px;
+        }
+        .status-badge.ok {
+            background-color: #e6f4ea;
+            color: #137333;
+        }
+        .status-badge.error {
+            background-color: #fce8e6;
+            color: #c5221f;
+        }
+        .status-badge.warning {
+            background-color: #fef7e0;
+            color: #ea8600;
+        }
+        .status-badge.unknown {
+            background-color: #f1f3f4;
+            color: #5f6368;
+        }
+        .tab-container {
+            border-bottom: 1px solid #ddd;
+            margin-bottom: 20px;
+        }
+        .tab {
+            display: inline-block;
+            padding: 10px 15px;
+            cursor: pointer;
+            border: 1px solid transparent;
+        }
+        .tab.active {
+            border: 1px solid #ddd;
+            border-bottom-color: white;
+            border-radius: 4px 4px 0 0;
+            margin-bottom: -1px;
+            background-color: white;
+            font-weight: bold;
+            color: #4285F4;
+        }
+        .tab:hover:not(.active) {
+            background-color: #f1f3f4;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        table, th, td {
+            border: 1px solid #ddd;
+        }
+        th, td {
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f1f3f4;
+        }
+        .summary-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 5px;
+            padding: 5px 0;
+            border-bottom: 1px solid #eee;
+        }
+        .summary-label {
+            font-weight: bold;
+        }
+        .action-button {
+            padding: 6px 12px;
+            margin: 0 5px;
+            font-size: 13px;
+        }
+        .refreshing {
+            opacity: 0.7;
+            pointer-events: none;
         }
     </style>
 </head>
 <body>
     <h1>Image Similarity Explorer Admin</h1>
     
-    <div class="card">
-        <h2>Database Management</h2>
-        <button id="resetDb">Reset Database & Repopulate</button>
-        <button id="fixDb">Fix Database (Remove Missing Images)</button>
-        <div id="dbResult"></div>
+    <div class="tab-container">
+        <div class="tab active" data-tab="dashboard">Dashboard</div>
+        <div class="tab" data-tab="database">Database</div>
+        <div class="tab" data-tab="images">Images</div>
+        <div class="tab" data-tab="logs">Logs</div>
+        <div class="tab" data-tab="diagnostics">Diagnostics</div>
     </div>
     
-    <div class="card">
-        <h2>Database/Filesystem Sync</h2>
-        <button id="checkSync">Check Sync Status</button>
-        <div id="syncResult"></div>
+    <!-- Dashboard Tab -->
+    <div id="dashboard" class="tab-content active">
+        <div class="card">
+            <h2>System Status</h2>
+            <div id="systemStatusContent">Loading system status...</div>
+        </div>
+        
+        <div class="card">
+            <h2>Quick Actions</h2>
+            <div class="control-row">
+                <button id="quickCheckDb" class="action-button">Check Database</button>
+                <button id="quickCheckSync" class="action-button">Check Sync</button>
+                <button id="quickFixDb" class="action-button">Fix Database</button>
+                <button id="quickResetDb" class="action-button">Reset Database</button>
+            </div>
+        </div>
+        
+        <div class="card">
+            <h2>Recent Logs</h2>
+            <div class="logs-teaser" id="logsTeaser">Loading recent logs...</div>
+            <div class="control-row">
+                <button onclick="window.location.href='/admin/logs'">View All Logs</button>
+                <button onclick="refreshLogs()">Refresh Logs</button>
+            </div>
+        </div>
     </div>
     
-    <div class="card">
-        <h2>Image Directory</h2>
-        <button id="listImages">List Available Images</button>
-        <div id="imagesResult"></div>
+    <!-- Database Tab -->
+    <div id="database" class="tab-content">
+        <div class="card">
+            <h2>
+                Database Status
+                <span id="dbStatusIndicator" class="status-indicator status-unknown"></span>
+            </h2>
+            <div id="dbStatusContent">Loading database status...</div>
+            <div class="control-row">
+                <button id="checkDb">Check Database Connection</button>
+                <button id="resetDb">Reset Database & Repopulate</button>
+                <button id="fixDb">Fix Database (Remove Missing Images)</button>
+            </div>
+            <div id="dbResult"></div>
+        </div>
     </div>
     
-    <div class="card">
-        <h2>Database Status</h2>
-        <button id="checkDb">Check Database</button>
-        <div id="checkResult"></div>
+    <!-- Images Tab -->
+    <div id="images" class="tab-content">
+        <div class="card">
+            <h2>
+                Image Directory
+                <span id="imagesDirStatusIndicator" class="status-indicator status-unknown"></span>
+            </h2>
+            <div id="imagesDirContent">Loading images directory information...</div>
+            <div class="control-row">
+                <button id="verifyImagesDir">Verify Images Directory</button>
+                <button id="listImages">List Available Images</button>
+            </div>
+            <div id="imagesResult"></div>
+        </div>
+        
+        <div class="card">
+            <h2>
+                Database/Filesystem Sync
+                <span id="syncStatusIndicator" class="status-indicator status-unknown"></span>
+            </h2>
+            <div id="syncContent">No sync information available yet.</div>
+            <div class="control-row">
+                <button id="checkSync">Check Sync Status</button>
+            </div>
+            <div id="syncResult"></div>
+        </div>
     </div>
     
-    <div class="card">
-        <h2>Application Logs</h2>
-        <div class="logs-teaser" id="logsTeaser">Loading recent logs...</div>
-        <button onclick="window.location.href='/admin/logs'">View All Logs</button>
-        <button onclick="refreshLogs()">Refresh</button>
+    <!-- Logs Tab -->
+    <div id="logs" class="tab-content">
+        <div class="card">
+            <h2>Application Logs</h2>
+            <div class="control-row">
+                <button id="viewAllLogs">View All Logs</button>
+                <button id="viewErrorLogs">View Errors Only</button>
+                <button id="viewWarningLogs">View Warnings Only</button>
+                <button id="refreshLogs">Refresh Logs</button>
+                <button id="clearLogs">Clear Logs</button>
+            </div>
+            <div class="logs-teaser" id="logsFullDisplay">Loading logs...</div>
+        </div>
+    </div>
+    
+    <!-- Diagnostics Tab -->
+    <div id="diagnostics" class="tab-content">
+        <div class="card">
+            <h2>System Information</h2>
+            <div id="systemInfo">Loading system information...</div>
+        </div>
+        
+        <div class="card">
+            <h2>Connection Tests</h2>
+            <div class="control-row">
+                <button id="testDbConnection">Test Database Connection</button>
+                <button id="testImageDir">Test Image Directory Access</button>
+            </div>
+            <div id="connectionTestResult"></div>
+        </div>
     </div>
     
     <script>
-        // Fetch recent logs for the teaser
-        async function refreshLogs() {
+        // Add this to the top of your script
+        function addBaseUrl(path) {
+            // Get current origin (protocol + hostname + port)
+            const origin = window.location.origin;
+            // Remove trailing slash from origin and leading slash from path if needed
+            return `${origin}${path.startsWith('/') ? '' : '/'}${path}`;
+        }
+
+        // Generic fetch with timeout
+        async function fetchWithTimeout(url, timeoutMs = 5000) {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+            
             try {
-                const response = await fetch('/admin/logs?format=json&limit=10');
-                const logs = await response.json();
-                
-                const logsHtml = logs.map(log => 
-                    `<div style="${getLogStyle(log.level)}">${log.timestamp} - ${log.level} - ${log.message}</div>`
-                ).join('');
-                
-                document.getElementById('logsTeaser').innerHTML = logsHtml || 'No logs available';
+                console.log(`Fetching ${url} with ${timeoutMs}ms timeout`);
+                const response = await fetch(url, { 
+                    signal: controller.signal,
+                    headers: {
+                        'Accept': 'application/json',
+                        'Cache-Control': 'no-cache'
+                    }
+                });
+                clearTimeout(timeoutId);
+                return response;
             } catch (error) {
-                document.getElementById('logsTeaser').innerHTML = `Error loading logs: ${error.message}`;
+                clearTimeout(timeoutId);
+                console.error(`Fetch error for ${url}:`, error);
+                throw error;
+            }
+        }
+
+        // Generic fetch with loading state and error handling
+        async function fetchDataWithLoading(url, method = 'GET', resultElement = null, loadingMessage = 'Loading...') {
+            try {
+                // Add base URL if needed
+                const fullUrl = url.startsWith('http') ? url : addBaseUrl(url);
+                console.log(`Starting fetch request to: ${fullUrl}`);
+                
+                if (resultElement) {
+                    resultElement.innerHTML = `<div class="spinner"></div> ${loadingMessage}`;
+                    resultElement.parentElement.classList.add('refreshing');
+                }
+                
+                // Use timeout of 10 seconds
+                const response = await fetchWithTimeout(fullUrl, 10000);
+                console.log(`Response received:`, response);
+                
+                // Check if response is ok
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                console.log(`Data received:`, data);
+                
+                if (resultElement) {
+                    resultElement.parentElement.classList.remove('refreshing');
+                }
+                
+                return { success: true, data };
+            } catch (error) {
+                console.error(`Error in fetchDataWithLoading:`, error);
+                
+                let errorMessage = error.message;
+                if (error.name === 'AbortError') {
+                    errorMessage = 'Request timed out after 10 seconds';
+                }
+                
+                if (resultElement) {
+                    resultElement.innerHTML = `<pre class="error">Error: ${errorMessage}</pre>`;
+                    resultElement.parentElement.classList.remove('refreshing');
+                }
+                
+                return { success: false, error };
+            }
+        }
+        // Tab switching functionality
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                // Hide all tabs
+                document.querySelectorAll('.tab-content').forEach(content => {
+                    content.classList.remove('active');
+                });
+                
+                // Deactivate all tab buttons
+                document.querySelectorAll('.tab').forEach(t => {
+                    t.classList.remove('active');
+                });
+                
+                // Activate selected tab and content
+                tab.classList.add('active');
+                const tabName = tab.getAttribute('data-tab');
+                document.getElementById(tabName).classList.add('active');
+            });
+        });
+        
+        // Generic fetch with loading state and error handling
+        async function fetchDataWithLoading(url, method = 'GET', resultElement = null, loadingMessage = 'Loading...') {
+            try {
+                if (resultElement) {
+                    resultElement.innerHTML = `<div class="spinner"></div> ${loadingMessage}`;
+                    resultElement.parentElement.classList.add('refreshing');
+                }
+                
+                const options = { method };
+                const response = await fetch(url, options);
+                const data = await response.json();
+                
+                if (resultElement) {
+                    resultElement.parentElement.classList.remove('refreshing');
+                }
+                
+                return { success: true, data };
+            } catch (error) {
+                if (resultElement) {
+                    resultElement.innerHTML = `<pre class="error">Error: ${error.message}</pre>`;
+                    resultElement.parentElement.classList.remove('refreshing');
+                }
+                
+                return { success: false, error };
             }
         }
         
+        // Create a status badge element
+        function createStatusBadge(status) {
+            const statusClass = status.toLowerCase();
+            return `<span class="status-badge ${statusClass}">${status}</span>`;
+        }
+        
+        // Update system status summary on dashboard
+        // Update system status summary on dashboard
+        async function updateSystemStatus() {
+            const statusContainer = document.getElementById('systemStatusContent');
+            
+            try {
+                statusContainer.innerHTML = '<div class="spinner"></div> Checking system status...';
+                
+                // First try ping to ensure basic connectivity
+                try {
+                    await fetchWithTimeout(addBaseUrl('/debug/ping'), 3000);
+                    console.log('Ping successful, proceeding with status checks');
+                } catch (error) {
+                    console.error('Ping failed:', error);
+                    statusContainer.innerHTML = `
+                        <div style="color: red; margin-bottom: 10px;">
+                            Server communication error: ${error.name === 'AbortError' ? 'Request timed out' : error.message}
+                        </div>
+                        <button onclick="updateSystemStatus()" class="action-button">Retry</button>
+                    `;
+                    return;
+                }
+                
+                // Now do the main status checks
+                console.log('Fetching database status...');
+                const dbResult = await fetchDataWithLoading('/debug/db');
+                
+                console.log('Fetching images status...');
+                const imagesResult = await fetchDataWithLoading('/debug/images');
+                
+                console.log('Fetching sync status...');
+                const syncResult = await fetchDataWithLoading('/debug/sync');
+                
+                // Process results
+                const dbStatus = dbResult.success && dbResult.data.connection === 'OK' ? 'OK' : 'ERROR';
+                const imagesStatus = imagesResult.success ? 'OK' : 'ERROR';
+                const syncNeeded = syncResult.success && syncResult.data.sync_needed === true;
+                const syncStatus = !syncResult.success ? 'ERROR' : (syncNeeded ? 'WARNING' : 'OK');
+                
+                // Update the system status panel
+                // Rest of your existing code
+            } catch (error) {
+                console.error("Error in updateSystemStatus:", error);
+                statusContainer.innerHTML = `
+                    <div style="color: red; margin-bottom: 10px;">
+                        Error checking system status: ${error.message}
+                    </div>
+                    <button onclick="updateSystemStatus()" class="action-button">Retry</button>
+                `;
+            }
+        }
+        
+        // Update status indicator
+        function updateStatusIndicator(elementId, status) {
+            const indicator = document.getElementById(elementId);
+            if (!indicator) return;
+            
+            // Remove all status classes
+            indicator.classList.remove('status-good', 'status-warning', 'status-error', 'status-unknown');
+            
+            // Add appropriate class
+            switch (status) {
+                case 'OK':
+                    indicator.classList.add('status-good');
+                    break;
+                case 'WARNING':
+                    indicator.classList.add('status-warning');
+                    break;
+                case 'ERROR':
+                    indicator.classList.add('status-error');
+                    break;
+                default:
+                    indicator.classList.add('status-unknown');
+                    break;
+            }
+        }
+        
+        // Format database status information
+        function formatDatabaseStatus(data) {
+            if (!data) return 'No database information available.';
+            
+            const connectionStatus = data.connection === 'OK' ? 
+                `<span style="color: green;">Connected</span>` : 
+                `<span style="color: red;">Disconnected: ${data.error || 'Unknown error'}</span>`;
+            
+            return `
+                <div class="summary-item">
+                    <span class="summary-label">Connection Status:</span>
+                    <span>${connectionStatus}</span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">URI:</span>
+                    <span>${data.neo4j_uri || 'Not available'}</span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">Image Count:</span>
+                    <span>${data.image_count !== undefined ? data.image_count : 'Unknown'}</span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">Sample Images:</span>
+                    <span>${data.sample_images && data.sample_images.length ? data.sample_images.length : 'None'}</span>
+                </div>
+            `;
+        }
+        
+        // Format images directory status
+        function formatImagesDirectoryStatus(data) {
+            if (!data) return 'No images directory information available.';
+            
+            if (data.error) {
+                return `<div style="color: red;">Error: ${data.error}</div>`;
+            }
+            
+            return `
+                <div class="summary-item">
+                    <span class="summary-label">Images Directory:</span>
+                    <span>${data.images_dir || 'Not available'}</span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">Image Count:</span>
+                    <span>${data.image_count !== undefined ? data.image_count : 'Unknown'}</span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">First 5 Images:</span>
+                    <span>${data.images && data.images.length ? data.images.slice(0, 5).join(', ') + (data.images.length > 5 ? '...' : '') : 'None'}</span>
+                </div>
+            `;
+        }
+        
+        // Format sync status information
+        function formatSyncStatus(data) {
+            if (!data) return 'No sync information available.';
+            
+            if (data.error) {
+                return `<div style="color: red;">Error: ${data.error}</div>`;
+            }
+            
+            const syncNeeded = data.sync_needed === true;
+            const syncStatus = syncNeeded ? 
+                `<span style="color: orange;">Needs synchronization</span>` : 
+                `<span style="color: green;">In sync</span>`;
+            
+            return `
+                <div class="summary-item">
+                    <span class="summary-label">Sync Status:</span>
+                    <span>${syncStatus}</span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">Database Images:</span>
+                    <span>${data.db_image_count !== undefined ? data.db_image_count : 'Unknown'}</span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">Filesystem Images:</span>
+                    <span>${data.fs_image_count !== undefined ? data.fs_image_count : 'Unknown'}</span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">Missing in Database:</span>
+                    <span>${data.missing_in_database ? data.missing_in_database.length : '0'}</span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">Missing in Filesystem:</span>
+                    <span>${data.missing_in_filesystem ? data.missing_in_filesystem.length : '0'}</span>
+                </div>
+            `;
+        }
+        
+        // Get log style based on level
         function getLogStyle(level) {
             switch(level) {
                 case 'ERROR': return 'color: red;';
@@ -114,84 +610,477 @@
             }
         }
         
-        document.getElementById('resetDb').addEventListener('click', async () => {
-            if (confirm('This will RESET the entire database and rebuild it from the images directory. Continue?')) {
-                try {
-                    const result = document.getElementById('dbResult');
-                    result.innerHTML = 'Processing...';
-                    
-                    const response = await fetch('/admin/reset-db', { method: 'POST' });
-                    const data = await response.json();
-                    
-                    result.innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
-                    refreshLogs();
-                } catch (error) {
-                    document.getElementById('dbResult').innerHTML = `<pre>Error: ${error.message}</pre>`;
+        // Fetch recent logs for the teaser
+        async function refreshLogs() {
+            try {
+                document.getElementById('logsTeaser').innerHTML = '<div class="spinner"></div> Loading logs...';
+                
+                const response = await fetch('/admin/logs?format=json&limit=10');
+                const logs = await response.json();
+                
+                const logsHtml = logs.map(log => 
+                    `<div style="${getLogStyle(log.level)}">${log.timestamp} - ${log.level} - ${log.message}</div>`
+                ).join('');
+                
+                document.getElementById('logsTeaser').innerHTML = logsHtml || 'No logs available';
+                
+                // Also update the full logs display if visible
+                if (document.getElementById('logs').classList.contains('active')) {
+                    await refreshFullLogs();
                 }
+            } catch (error) {
+                document.getElementById('logsTeaser').innerHTML = `Error loading logs: ${error.message}`;
             }
-        });
+        }
         
-        document.getElementById('fixDb').addEventListener('click', async () => {
-            if (confirm('This will remove database nodes for images that don\'t exist in the filesystem. Continue?')) {
-                try {
-                    const result = document.getElementById('dbResult');
-                    result.innerHTML = 'Processing...';
-                    
-                    const response = await fetch('/admin/fix-db', { method: 'POST' });
-                    const data = await response.json();
-                    
-                    result.innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
-                    refreshLogs();
-                } catch (error) {
-                    document.getElementById('dbResult').innerHTML = `<pre>Error: ${error.message}</pre>`;
+        // Fetch full logs for the logs tab
+        async function refreshFullLogs(level = null, limit = 100) {
+            try {
+                document.getElementById('logsFullDisplay').innerHTML = '<div class="spinner"></div> Loading logs...';
+                
+                let url = `/admin/logs?format=json&limit=${limit}`;
+                if (level) {
+                    url += `&level=${level}`;
                 }
-            }
-        });
-        
-        document.getElementById('checkSync').addEventListener('click', async () => {
-            try {
-                const result = document.getElementById('syncResult');
-                result.innerHTML = 'Loading...';
                 
-                const response = await fetch('/debug/sync');
-                const data = await response.json();
+                const response = await fetch(url);
+                const logs = await response.json();
                 
-                result.innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+                const logsHtml = logs.map(log => 
+                    `<div style="${getLogStyle(log.level)}">${log.timestamp} - ${log.level} - ${log.message}</div>`
+                ).join('');
+                
+                document.getElementById('logsFullDisplay').innerHTML = logsHtml || 'No logs available';
             } catch (error) {
-                document.getElementById('syncResult').innerHTML = `<pre>Error: ${error.message}</pre>`;
+                document.getElementById('logsFullDisplay').innerHTML = `Error loading logs: ${error.message}`;
             }
-        });
+        }
         
-        document.getElementById('listImages').addEventListener('click', async () => {
+        // Check database connection
+        async function checkDatabase() {
+            const result = document.getElementById('dbResult');
+            const statusContent = document.getElementById('dbStatusContent');
+            
             try {
-                const result = document.getElementById('imagesResult');
-                result.innerHTML = 'Loading...';
-                
-                const response = await fetch('/debug/images');
-                const data = await response.json();
-                
-                result.innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
-            } catch (error) {
-                document.getElementById('imagesResult').innerHTML = `<pre>Error: ${error.message}</pre>`;
-            }
-        });
-        
-        document.getElementById('checkDb').addEventListener('click', async () => {
-            try {
-                const result = document.getElementById('checkResult');
-                result.innerHTML = 'Connecting to database...';
+                result.innerHTML = '<div class="spinner"></div> Checking database connection...';
+                result.parentElement.classList.add('refreshing');
                 
                 const response = await fetch('/debug/db');
                 const data = await response.json();
                 
+                result.parentElement.classList.remove('refreshing');
                 result.innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+                
+                // Update status indicator
+                updateStatusIndicator('dbStatusIndicator', data.connection === 'OK' ? 'OK' : 'ERROR');
+                
+                // Update status content
+                statusContent.innerHTML = formatDatabaseStatus(data);
+                
+                // Also update system status
+                updateSystemStatus();
             } catch (error) {
-                document.getElementById('checkResult').innerHTML = `<pre>Error: ${error.message}</pre>`;
+                result.parentElement.classList.remove('refreshing');
+                result.innerHTML = `<pre>Error: ${error.message}</pre>`;
+                updateStatusIndicator('dbStatusIndicator', 'ERROR');
             }
-        });
+        }
         
-        // Initial logs load
-        refreshLogs();
+        // Check sync status
+        async function checkSyncStatus() {
+            const result = document.getElementById('syncResult');
+            const statusContent = document.getElementById('syncContent');
+            
+            try {
+                result.innerHTML = '<div class="spinner"></div> Checking sync status...';
+                result.parentElement.classList.add('refreshing');
+                
+                const response = await fetch('/debug/sync');
+                const data = await response.json();
+                
+                result.parentElement.classList.remove('refreshing');
+                result.innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+                
+                // Update status content
+                statusContent.innerHTML = formatSyncStatus(data);
+                
+                // Update status indicator
+                const syncNeeded = data.sync_needed === true;
+                updateStatusIndicator('syncStatusIndicator', syncNeeded ? 'WARNING' : 'OK');
+                
+                // Also update system status
+                updateSystemStatus();
+            } catch (error) {
+                result.parentElement.classList.remove('refreshing');
+                result.innerHTML = `<pre>Error: ${error.message}</pre>`;
+                updateStatusIndicator('syncStatusIndicator', 'ERROR');
+            }
+        }
+        
+        // List available images
+        async function listImages() {
+            const result = document.getElementById('imagesResult');
+            const statusContent = document.getElementById('imagesDirContent');
+            
+            try {
+                result.innerHTML = '<div class="spinner"></div> Listing images...';
+                result.parentElement.classList.add('refreshing');
+                
+                const response = await fetch('/debug/images');
+                const data = await response.json();
+                
+                result.parentElement.classList.remove('refreshing');
+                result.innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+                
+                // Update status content
+                statusContent.innerHTML = formatImagesDirectoryStatus(data);
+                
+                // Update status indicator
+                updateStatusIndicator('imagesDirStatusIndicator', data.error ? 'ERROR' : 'OK');
+                
+                // Also update system status
+                updateSystemStatus();
+            } catch (error) {
+                result.parentElement.classList.remove('refreshing');
+                result.innerHTML = `<pre>Error: ${error.message}</pre>`;
+                updateStatusIndicator('imagesDirStatusIndicator', 'ERROR');
+            }
+        }
+        
+        // Verify images directory
+        async function verifyImagesDirectory() {
+            const result = document.getElementById('imagesResult');
+            
+            try {
+                result.innerHTML = '<div class="spinner"></div> Verifying images directory...';
+                result.parentElement.classList.add('refreshing');
+                
+                // This would call a backend API, but we'll just use the list images endpoint for now
+                const response = await fetch('/debug/images');
+                const data = await response.json();
+                
+                result.parentElement.classList.remove('refreshing');
+                
+                // Format directory info
+                const dirInfo = `
+                    <h3>Images Directory Information</h3>
+                    <div class="summary-item">
+                        <span class="summary-label">Directory Path:</span>
+                        <span>${data.images_dir || 'Not available'}</span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="summary-label">Image Count:</span>
+                        <span>${data.image_count || '0'}</span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="summary-label">Status:</span>
+                        <span>${data.error ? 'Error' : 'Available'} ${createStatusBadge(data.error ? 'ERROR' : 'OK')}</span>
+                    </div>
+                `;
+                
+                result.innerHTML = dirInfo;
+                
+                // Update status indicator
+                updateStatusIndicator('imagesDirStatusIndicator', data.error ? 'ERROR' : 'OK');
+            } catch (error) {
+                result.parentElement.classList.remove('refreshing');
+                result.innerHTML = `<pre>Error: ${error.message}</pre>`;
+                updateStatusIndicator('imagesDirStatusIndicator', 'ERROR');
+            }
+        }
+        
+        // Fix database
+        async function fixDatabase() {
+            if (confirm('This will remove database nodes for images that don\'t exist in the filesystem. Continue?')) {
+                try {
+                    const result = document.getElementById('dbResult');
+                    result.innerHTML = '<div class="spinner"></div> Fixing database...';
+                    result.parentElement.classList.add('refreshing');
+                    
+                    const response = await fetch('/admin/fix-db', { method: 'POST' });
+                    const data = await response.json();
+                    
+                    result.parentElement.classList.remove('refreshing');
+                    result.innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+                    
+                    // Update database status
+                    await checkDatabase();
+                    
+                    // Update sync status
+                    await checkSyncStatus();
+                    
+                    // Update logs
+                    refreshLogs();
+                } catch (error) {
+                    result.parentElement.classList.remove('refreshing');
+                    result.innerHTML = `<pre>Error: ${error.message}</pre>`;
+                }
+            }
+        }
+        
+        // Reset database
+        async function resetDatabase() {
+            if (confirm('This will RESET the entire database and rebuild it from the images directory. Continue?')) {
+                try {
+                    const result = document.getElementById('dbResult');
+                    result.innerHTML = '<div class="spinner"></div> Resetting database...';
+                    result.parentElement.classList.add('refreshing');
+                    
+                    const response = await fetch('/admin/reset-db', { method: 'POST' });
+                    const data = await response.json();
+                    
+                    result.parentElement.classList.remove('refreshing');
+                    result.innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+                    
+                    // Update database status
+                    await checkDatabase();
+                    
+                    // Update sync status
+                    await checkSyncStatus();
+                    
+                    // Update logs
+                    refreshLogs();
+                } catch (error) {
+                    result.parentElement.classList.remove('refreshing');
+                    result.innerHTML = `<pre>Error: ${error.message}</pre>`;
+                }
+            }
+        }
+        
+        // Clear logs
+        async function clearAllLogs() {
+            if (confirm('Are you sure you want to clear all logs?')) {
+                try {
+                    const response = await fetch('/admin/logs/clear', { method: 'POST' });
+                    const data = await response.json();
+                    
+                    if (data.status === 'ok') {
+                        await refreshLogs();
+                        await refreshFullLogs();
+                    }
+                } catch (error) {
+                    console.error('Error clearing logs:', error);
+                    alert('Error clearing logs: ' + error.message);
+                }
+            }
+        }
+        
+        // Fetch system information
+        async function fetchSystemInfo() {
+            const infoElement = document.getElementById('systemInfo');
+            
+            try {
+                infoElement.innerHTML = '<div class="spinner"></div> Loading system information...';
+                
+                // Get database info
+                const dbResult = await fetchDataWithLoading('/debug/db');
+                
+                // Build system info HTML
+                let systemInfoHtml = `
+                    <h3>Database Information</h3>
+                    <div class="summary-item">
+                        <span class="summary-label">Connection:</span>
+                        <span>${dbResult.success && dbResult.data.connection === 'OK' ? 'Connected' : 'Disconnected'}</span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="summary-label">Neo4j URI:</span>
+                        <span>${dbResult.data?.neo4j_uri || 'Not available'}</span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="summary-label">Image Count:</span>
+                        <span>${dbResult.data?.image_count !== undefined ? dbResult.data.image_count : 'Unknown'}</span>
+                    </div>
+                    
+                    <h3>Environment Information</h3>
+                    <div class="summary-item">
+                        <span class="summary-label">Browser:</span>
+                        <span>${navigator.userAgent}</span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="summary-label">Time:</span>
+                        <span>${new Date().toLocaleString()}</span>
+                    </div>
+                `;
+                
+                infoElement.innerHTML = systemInfoHtml;
+            } catch (error) {
+                infoElement.innerHTML = `<pre class="error">Error fetching system information: ${error.message}</pre>`;
+            }
+        }
+        
+        // Test database connection
+        async function testDatabaseConnection() {
+            const resultElement = document.getElementById('connectionTestResult');
+            
+            try {
+                resultElement.innerHTML = '<div class="spinner"></div> Testing database connection...';
+                
+                const response = await fetch('/debug/db');
+                const data = await response.json();
+                
+                let resultHtml = `<h3>Database Connection Test Results</h3>`;
+                
+                if (data.connection === 'OK') {
+                    resultHtml += `
+                        <div style="color: green; margin: 10px 0;">
+                            <strong>✓ Connection successful!</strong>
+                        </div>
+                        <div class="summary-item">
+                            <span class="summary-label">URI:</span>
+                            <span>${data.neo4j_uri || 'Not available'}</span>
+                        </div>
+                        <div class="summary-item">
+                            <span class="summary-label">Image Count:</span>
+                            <span>${data.image_count}</span>
+                        </div>
+                    `;
+                } else {
+                    resultHtml += `
+                        <div style="color: red; margin: 10px 0;">
+                            <strong>✗ Connection failed:</strong> ${data.error || 'Unknown error'}
+                        </div>
+                        <div class="summary-item">
+                            <span class="summary-label">URI:</span>
+                            <span>${data.neo4j_uri || 'Not available'}</span>
+                        </div>
+                    `;
+                    
+                    if (data.trace) {
+                        resultHtml += `<pre style="font-size: 12px; max-height: 200px;">${data.trace}</pre>`;
+                    }
+                }
+                
+                resultElement.innerHTML = resultHtml;
+            } catch (error) {
+                resultElement.innerHTML = `
+                    <h3>Database Connection Test Results</h3>
+                    <div style="color: red; margin: 10px 0;">
+                        <strong>✗ Connection test failed:</strong> ${error.message}
+                    </div>
+                `;
+            }
+        }
+        
+        // Test image directory access
+        async function testImageDirAccess() {
+            const resultElement = document.getElementById('connectionTestResult');
+            
+            try {
+                resultElement.innerHTML = '<div class="spinner"></div> Testing image directory access...';
+                
+                const response = await fetch('/debug/images');
+                const data = await response.json();
+                
+                let resultHtml = `<h3>Image Directory Test Results</h3>`;
+                
+                if (!data.error) {
+                    resultHtml += `
+                        <div style="color: green; margin: 10px 0;">
+                            <strong>✓ Directory access successful!</strong>
+                        </div>
+                        <div class="summary-item">
+                            <span class="summary-label">Directory:</span>
+                            <span>${data.images_dir}</span>
+                        </div>
+                        <div class="summary-item">
+                            <span class="summary-label">Image Count:</span>
+                            <span>${data.image_count}</span>
+                        </div>
+                    `;
+                    
+                    if (data.images && data.images.length > 0) {
+                        resultHtml += `
+                            <div class="summary-item">
+                                <span class="summary-label">Sample Images:</span>
+                                <span>${data.images.slice(0, 5).join(', ')}${data.images.length > 5 ? '...' : ''}</span>
+                            </div>
+                        `;
+                    }
+                } else {
+                    resultHtml += `
+                        <div style="color: red; margin: 10px 0;">
+                            <strong>✗ Directory access failed:</strong> ${data.error}
+                        </div>
+                        <div class="summary-item">
+                            <span class="summary-label">Current Directory:</span>
+                            <span>${data.cwd || 'Not available'}</span>
+                        </div>
+                    `;
+                }
+                
+                resultElement.innerHTML = resultHtml;
+            } catch (error) {
+                resultElement.innerHTML = `
+                    <h3>Image Directory Test Results</h3>
+                    <div style="color: red; margin: 10px 0;">
+                        <strong>✗ Directory test failed:</strong> ${error.message}
+                    </div>
+                `;
+            }
+        }
+        
+        // Add event listeners
+        document.addEventListener('DOMContentLoaded', () => {
+            // Database tab
+            document.getElementById('checkDb').addEventListener('click', checkDatabase);
+            document.getElementById('resetDb').addEventListener('click', resetDatabase);
+            document.getElementById('fixDb').addEventListener('click', fixDatabase);
+            
+            // Images tab
+            document.getElementById('listImages').addEventListener('click', listImages);
+            document.getElementById('checkSync').addEventListener('click', checkSyncStatus);
+            document.getElementById('verifyImagesDir').addEventListener('click', verifyImagesDirectory);
+            
+            // Logs tab
+            document.getElementById('viewAllLogs').addEventListener('click', () => refreshFullLogs(null, 100));
+            document.getElementById('viewErrorLogs').addEventListener('click', () => refreshFullLogs('ERROR', 100));
+            document.getElementById('viewWarningLogs').addEventListener('click', () => refreshFullLogs('WARNING', 100));
+            document.getElementById('refreshLogs').addEventListener('click', () => refreshFullLogs(null, 100));
+            document.getElementById('clearLogs').addEventListener('click', clearAllLogs);
+            
+            // Diagnostics tab
+            document.getElementById('testDbConnection').addEventListener('click', testDatabaseConnection);
+            document.getElementById('testImageDir').addEventListener('click', testImageDirAccess);
+            
+            // Dashboard quick actions
+            document.getElementById('quickCheckDb').addEventListener('click', () => {
+                checkDatabase();
+                document.querySelector('.tab[data-tab="database"]').click();
+            });
+            
+            document.getElementById('quickCheckSync').addEventListener('click', () => {
+                checkSyncStatus();
+                document.querySelector('.tab[data-tab="images"]').click();
+            });
+            
+            document.getElementById('quickFixDb').addEventListener('click', () => {
+                fixDatabase();
+                document.querySelector('.tab[data-tab="database"]').click();
+            });
+            
+            document.getElementById('quickResetDb').addEventListener('click', () => {
+                resetDatabase();
+                document.querySelector('.tab[data-tab="database"]').click();
+            });
+            
+            // Load initial data
+            updateSystemStatus();
+            refreshLogs();
+            fetchSystemInfo();
+            
+            // Set up tab content loading
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.addEventListener('click', () => {
+                    const tabName = tab.getAttribute('data-tab');
+                    
+                    // Load content based on tab
+                    if (tabName === 'logs' && document.getElementById('logsFullDisplay').innerHTML === 'Loading logs...') {
+                        refreshFullLogs();
+                    }
+                    else if (tabName === 'diagnostics' && document.getElementById('systemInfo').innerHTML === 'Loading system information...') {
+                        fetchSystemInfo();
+                    }
+                });
+            });
+        });
     </script>
-</body>
-</html>
