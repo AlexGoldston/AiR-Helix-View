@@ -5,6 +5,7 @@ import glob
 import logging
 import traceback
 import sys
+import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, TimeoutError
 
@@ -102,8 +103,24 @@ def main():
         
         # Use threaded mode to help with potential blocking issues
         print("Starting Flask server...")
-        app.run(debug=True, port=5001, threaded=True)
-        print("Flask server started")
+        from werkzeug.serving import make_server
+        server = make_server('127.0.0.1', 5001, app)
+
+        #run in separate thread
+        server_thread = threading.Thread(target=server.serve_forever)
+        server_thread.daemon = True
+        server_thread.start()
+
+        print('Flask server started - press ctrl+c to stop')
+        # Run until interrupted
+        try:
+            # Keep the main thread running
+            while server_thread.is_alive():
+                server_thread.join(1)  # Check every second
+        except KeyboardInterrupt:
+            print("Shutting down server...")
+            server.shutdown()
+            print("Server shutdown complete")
     
     except Exception as e:
         print(f"Critical error during app startup: {str(e)}")

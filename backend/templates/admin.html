@@ -337,10 +337,10 @@
         }
 
         // Generic fetch with loading state and error handling
-        async function fetchDataWithLoading(url, method = 'GET', resultElement = null, loadingMessage = 'Loading...') {
+        async function fetchDataWithLoading(url, method = 'GET', resultElement = null, loadingMessage = 'Loading...', timeoutMs = 10000) {
             try {
                 // Add base URL if needed
-                const fullUrl = url.startsWith('http') ? url : addBaseUrl(url);
+                const fullUrl = url.startsWith('http') ? url : window.location.origin + (url.startsWith('/') ? url : '/' + url);
                 console.log(`Starting fetch request to: ${fullUrl}`);
                 
                 if (resultElement) {
@@ -348,37 +348,68 @@
                     resultElement.parentElement.classList.add('refreshing');
                 }
                 
-                // Use timeout of 10 seconds
-                const response = await fetchWithTimeout(fullUrl, 10000);
-                console.log(`Response received:`, response);
+                // Create AbortController for timeout
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
                 
-                // Check if response is ok
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
+                try {
+                    const response = await fetch(fullUrl, {
+                        method,
+                        headers: {
+                            'Accept': 'application/json',
+                            'Content-Type': 'application/json',
+                            'Cache-Control': 'no-cache, no-store'
+                        },
+                        signal: controller.signal
+                    });
+                    
+                    clearTimeout(timeoutId);
+                    console.log(`Response received from ${url}:`, response);
+                    
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! Status: ${response.status}`);
+                    }
+                    
+                    const data = await response.json();
+                    console.log(`Parsed JSON data from ${url}:`, data);
+                    
+                    if (resultElement) {
+                        resultElement.parentElement.classList.remove('refreshing');
+                    }
+                    
+                    return { success: true, data };
+                } catch (error) {
+                    clearTimeout(timeoutId);
+                    throw error;
                 }
-                
-                const data = await response.json();
-                console.log(`Data received:`, data);
-                
-                if (resultElement) {
-                    resultElement.parentElement.classList.remove('refreshing');
-                }
-                
-                return { success: true, data };
             } catch (error) {
-                console.error(`Error in fetchDataWithLoading:`, error);
+                console.error(`Error fetching from ${url}:`, error);
                 
                 let errorMessage = error.message;
                 if (error.name === 'AbortError') {
-                    errorMessage = 'Request timed out after 10 seconds';
+                    errorMessage = `Request timed out after ${timeoutMs/1000} seconds`;
                 }
                 
                 if (resultElement) {
-                    resultElement.innerHTML = `<pre class="error">Error: ${errorMessage}</pre>`;
+                    resultElement.innerHTML = `<div class="error" style="color: red; padding: 10px; background: #fff1f0; border-radius: 4px; margin-top: 10px;">
+                        <strong>Error:</strong> ${errorMessage}
+                        <button onclick="retryFetch('${url}', '${method}', this.parentElement.parentElement.id, '${loadingMessage}')" 
+                                style="display: block; margin-top: 10px; padding: 5px 10px; background: #4285F4; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                            Retry
+                        </button>
+                    </div>`;
                     resultElement.parentElement.classList.remove('refreshing');
                 }
                 
                 return { success: false, error };
+            }
+        }
+
+        // Add retry function
+        function retryFetch(url, method, elementId, loadingMessage) {
+            const element = document.getElementById(elementId);
+            if (element) {
+                fetchDataWithLoading(url, method, element, loadingMessage);
             }
         }
         // Tab switching functionality

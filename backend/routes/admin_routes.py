@@ -4,6 +4,7 @@ import glob
 import logging
 import traceback
 import time
+import threading
 from database import get_db_connection
 from utils.log_utils import get_memory_handler
 from utils.image_utils import clear_image_caches, normalize_image_path, image_exists
@@ -200,68 +201,111 @@ def list_images():
 def debug_sync():
     """Compare database images with filesystem images"""
     try:
-        # Get database connection
-        db = get_db_connection()
+        # Create a timeout mechanism
+        result = {"sync_status": "ERROR", "error": "Timeout"}
         
-        # Check if database is connected
-        try:
-            db.driver.verify_connectivity()
-        except Exception as e:
-            logger.error(f"Database connection error: {e}")
+        def check_sync():
+            nonlocal result
+            try:
+                # Get database connection
+                db = get_db_connection()
+                
+                # Check if database is connected
+                try:
+                    db.driver.verify_connectivity()
+                except Exception as e:
+                    logger.error(f"Database connection error: {e}")
+                    result = {
+                        "error": f"Database connection error: {e}",
+                        "sync_status": "ERROR"
+                    }
+                    return
+                
+                # Make sure images directory exists
+                if not os.path.exists(IMAGES_DIR):
+                    logger.error(f"Images directory not found: {IMAGES_DIR}")
+                    result = {
+                        "error": f"Images directory not found: {IMAGES_DIR}",
+                        "sync_status": "ERROR"
+                    }
+                    return
+                
+                # Get images from database (with timeout safety)
+                try:
+                    db_images = db.get_all_images()
+                    logger.info(f"Retrieved {len(db_images)} images from database")
+                except Exception as e:
+                    logger.error(f"Error getting images from database: {e}")
+                    result = {
+                        "error": f"Error getting images from database: {e}",
+                        "sync_status": "ERROR"
+                    }
+                    return
+                
+                # Get images from filesystem
+                fs_images = []
+                for ext in IMAGE_EXTENSIONS:
+                    if os.name == 'nt':  # Windows
+                        fs_images.extend([os.path.basename(f) for f in glob.glob(os.path.join(IMAGES_DIR, ext))])
+                    else:  # Linux, macOS, etc.
+                        fs_images.extend([os.path.basename(f) for f in glob.glob(os.path.join(IMAGES_DIR, ext))])
+                        fs_images.extend([os.path.basename(f) for f in glob.glob(os.path.join(IMAGES_DIR, ext.upper()))])
+                
+                # Remove duplicates
+                fs_images = list(set(fs_images))
+                logger.info(f"Found {len(fs_images)} images in filesystem")
+                
+                # Normalize all paths to just filenames
+                normalized_db_images = [normalize_image_path(img) for img in db_images]
+                
+                # Find differences
+                missing_in_fs = [img for img in normalized_db_images if img not in fs_images]
+                missing_in_db = [img for img in fs_images if img not in normalized_db_images]
+                
+                # Log results
+                logger.info(f"Sync result: {len(missing_in_fs)} missing in filesystem, {len(missing_in_db)} missing in database")
+                
+                result = {
+                    "db_image_count": len(db_images),
+                    "fs_image_count": len(fs_images),
+                    "missing_in_filesystem": missing_in_fs[:10],  # Limit to 10 for brevity
+                    "missing_in_database": missing_in_db[:10],    # Limit to 10 for brevity
+                    "missing_in_filesystem_count": len(missing_in_fs),
+                    "missing_in_database_count": len(missing_in_db),
+                    "sync_needed": len(missing_in_fs) > 0 or len(missing_in_db) > 0,
+                    "sync_status": "OK"
+                }
+            except Exception as e:
+                logger.error(f"Error checking sync: {e}")
+                logger.error(traceback.format_exc())
+                result = {
+                    "error": str(e),
+                    "sync_status": "ERROR",
+                    "trace": traceback.format_exc()
+                }
+        
+        # Run with timeout
+        thread = threading.Thread(target=check_sync)
+        thread.daemon = True
+        thread.start()
+        thread.join(timeout=5)  # 5-second timeout
+        
+        if thread.is_alive():
+            logger.error("Sync operation timed out")
             return jsonify({
-                "error": f"Database connection error: {e}",
-                "sync_status": "ERROR"
-            }), 500
+                "sync_status": "ERROR",
+                "error": "Sync operation timed out after 5 seconds"
+            })
         
-        # Make sure images directory exists
-        if not os.path.exists(IMAGES_DIR):
-            logger.error(f"Images directory not found: {IMAGES_DIR}")
-            return jsonify({
-                "error": f"Images directory not found: {IMAGES_DIR}",
-                "sync_status": "ERROR"
-            }), 404
+        return jsonify(result)
         
-        # Get images from database
-        db_images = db.get_all_images()
-        logger.info(f"Retrieved {len(db_images)} images from database")
-        
-        # Get images from filesystem
-        fs_images = []
-        for ext in IMAGE_EXTENSIONS:
-            if os.name == 'nt':  # Windows
-                fs_images.extend([os.path.basename(f) for f in glob.glob(os.path.join(IMAGES_DIR, ext))])
-            else:  # Linux, macOS, etc.
-                fs_images.extend([os.path.basename(f) for f in glob.glob(os.path.join(IMAGES_DIR, ext))])
-                fs_images.extend([os.path.basename(f) for f in glob.glob(os.path.join(IMAGES_DIR, ext.upper()))])
-        
-        # Remove duplicates
-        fs_images = list(set(fs_images))
-        logger.info(f"Found {len(fs_images)} images in filesystem")
-        
-        # Normalize all paths to just filenames
-        normalized_db_images = [normalize_image_path(img) for img in db_images]
-        
-        # Find differences
-        missing_in_fs = [img for img in normalized_db_images if img not in fs_images]
-        missing_in_db = [img for img in fs_images if img not in normalized_db_images]
-        
-        # Log results
-        logger.info(f"Sync result: {len(missing_in_fs)} missing in filesystem, {len(missing_in_db)} missing in database")
-        
-        return jsonify({
-            "db_image_count": len(db_images),
-            "fs_image_count": len(fs_images),
-            "missing_in_filesystem": missing_in_fs,
-            "missing_in_database": missing_in_db,
-            "sync_needed": len(missing_in_fs) > 0 or len(missing_in_db) > 0,
-            "sync_status": "OK"
-        })
     except Exception as e:
-        logger.error(f"Error checking sync: {e}")
+        logger.error(f"Error in debug_sync: {e}")
         logger.error(traceback.format_exc())
         return jsonify({
             "error": str(e),
-            "sync_status": "ERROR"
+            "sync_status": "ERROR",
+            "trace": traceback.format_exc()
         }), 500
 
 @admin_bp.route('/debug/ping')
