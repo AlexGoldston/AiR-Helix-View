@@ -24,6 +24,9 @@ const ImageSimilarityExplorer = () => {
   const [isAutoLoadingEnabled, setIsAutoLoadingEnabled] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [maxNodesLimit, setMaxNodesLimit] = useState(200);
+  const [extendedMode, setExtendedMode] = useState(true);  // Enable by default
+  const [neighborDepth, setNeighborDepth] = useState(2);
+  const [limitPerLevel, setLimitPerLevel] = useState(10);
   
   // Refs
   const imagesCache = useRef({});
@@ -192,8 +195,8 @@ const ImageSimilarityExplorer = () => {
     
     viewportBoundsRef.current = bounds;
     
-    // If auto-loading is enabled, find nodes to expand
-    if (isAutoLoadingEnabled && graphData.nodes.length > 0) {
+    // If auto-loading is enabled and not in extended mode, find nodes to expand
+    if (isAutoLoadingEnabled && !extendedMode && graphData.nodes.length > 0) {
       // Find visible nodes
       const visibleNodes = graphData.nodes.filter(node => 
         node.x >= bounds.xMin && node.x <= bounds.xMax &&
@@ -217,7 +220,7 @@ const ImageSimilarityExplorer = () => {
         }
       }
     }
-  }, [expandedNodes, graphData.nodes, isAutoLoadingEnabled, processLoadQueue]);
+  }, [expandedNodes, graphData.nodes, isAutoLoadingEnabled, extendedMode, processLoadQueue]);
 
   // Throttled version of viewport change handler to avoid too many calls
   const throttledViewportChangeHandler = useCallback(
@@ -254,6 +257,9 @@ const mergeGraphData = useCallback((currentData, newData) => {
   };
 }, []);
 
+
+
+
 // Fetch graph data from API
 useEffect(() => {
   const fetchData = async () => {
@@ -263,11 +269,20 @@ useEffect(() => {
     loadQueue.current = [];
     
     try {
-      console.log(`Fetching data for ${centerImage} with threshold ${similarityThreshold} and limit ${neighborLimit}`);
-      
-      // Call the backend API with just the filename
+      // Get filename
       const filename = getImageName(centerImage);
-      const response = await fetch(`http://localhost:5001/neighbors?image_path=${encodeURIComponent(filename)}&threshold=${similarityThreshold}&limit=${neighborLimit}`);
+      
+      // Choose endpoint and parameters based on mode
+      let url;
+      if (extendedMode) {
+        url = `http://localhost:5001/extended-neighbors?image_path=${encodeURIComponent(filename)}&threshold=${similarityThreshold}&depth=${neighborDepth}&limit_per_level=${limitPerLevel}&max_nodes=${maxNodesLimit}`;
+        console.log(`Fetching extended data for ${centerImage} with depth ${neighborDepth}`);
+      } else {
+        url = `http://localhost:5001/neighbors?image_path=${encodeURIComponent(filename)}&threshold=${similarityThreshold}&limit=${neighborLimit}`;
+        console.log(`Fetching direct neighbors for ${centerImage}`);
+      }
+      
+      const response = await fetch(url);
       
       if (!response.ok) {
         throw new Error(`API error: ${response.status}`);
@@ -277,12 +292,8 @@ useEffect(() => {
       console.log("API response:", apiData);
       setDebugData(apiData);
       
-      // Check if we received valid data
-      if (!apiData.nodes || !apiData.edges) {
-        console.error("Invalid data structure from API", apiData);
-        throw new Error("Invalid data structure from API");
-      }
-
+      // Rest of your data processing...
+      
       // Transform the API response to match ForceGraph expected format
       const graphData = {
         nodes: [],
@@ -302,7 +313,8 @@ useEffect(() => {
           id: node.id,
           path: node.path,
           label: node.label || getImageName(node.path),
-          isCenter: node.isCenter || false
+          isCenter: node.isCenter || false,
+          level: node.level || 0  // Use level if available for coloring
         });
       }
       
@@ -315,7 +327,7 @@ useEffect(() => {
           value: edge.weight
         });
       }
-      
+
       console.log("Processed graph data:", graphData);
       
       // Preload images for better rendering
@@ -330,10 +342,12 @@ useEffect(() => {
       if (graphRef.current) {
         setTimeout(() => {
           if (graphRef.current.d3Force('charge')) {
-            graphRef.current.d3Force('charge').strength(-500);
+            // Stronger charge force for more spread out display when in extended mode
+            graphRef.current.d3Force('charge').strength(extendedMode ? -700 : -500);
           }
           if (graphRef.current.d3Force('link')) {
-            graphRef.current.d3Force('link').distance(150);
+            // Extended mode may need longer links for better visibility
+            graphRef.current.d3Force('link').distance(extendedMode ? 200 : 150);
           }
           graphRef.current.zoomToFit(1000);
         }, 1000);
@@ -347,7 +361,7 @@ useEffect(() => {
   };
   
   fetchData();
-}, [centerImage, similarityThreshold, neighborLimit, getImageName, preloadImage]);
+}, [centerImage, similarityThreshold, neighborLimit, extendedMode, neighborDepth, limitPerLevel, maxNodesLimit, getImageName, preloadImage, mergeGraphData]);
 
 // Effect to calculate initial viewport
 useEffect(() => {
@@ -547,8 +561,55 @@ return (
                     className="w-full"
                   />
                 </div>
+
+                <div className="flex items-center">
+                  <input
+                    type="checkbox"
+                    id="extendedMode"
+                    checked={extendedMode}
+                    onChange={() => setExtendedMode(!extendedMode)}
+                    className="mr-2 h-4 w-4"
+                  />
+                  <label htmlFor="extendedMode" className="text-sm font-medium text-gray-400">
+                    Extended Graph View
+                  </label>
+                </div>
+                
+                {extendedMode && (
+                  <>
+                    <div>
+                      <label className="text-sm font-medium text-gray-400 mb-2 block">
+                        Network Depth: {neighborDepth}
+                      </label>
+                      <Slider 
+                        defaultValue={[neighborDepth]} 
+                        min={1} 
+                        max={3} 
+                        step={1}
+                        onValueChange={(values) => setNeighborDepth(values[0])}
+                        className="w-full"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        Higher depth shows more connections
+                      </p>
+                    </div>
+                    
+                    <div>
+                      <label className="text-sm font-medium text-gray-400 mb-2 block">
+                        Nodes Per Level: {limitPerLevel}
+                      </label>
+                      <Slider 
+                        defaultValue={[limitPerLevel]} 
+                        min={5} 
+                        max={20} 
+                        step={5}
+                        onValueChange={(values) => setLimitPerLevel(values[0])}
+                        className="w-full"
+                      />
+                    </div>
+                  </>
+                )}
               </div>
-              
               <div className="pt-4">
                 <Button 
                   variant="outline"
@@ -636,9 +697,9 @@ return (
             graphData={graphData}
             nodeLabel={node => `${getImageName(node.path)} ${node.isCenter ? '' : `(Similarity: ${(getSimilarity(node, graphData) * 100).toFixed(0)}%)`}`}
             nodeColor={node => node.isCenter ? '#ff6b6b' : '#4285F4'}
-            linkWidth={link => (link.value || 0.5) * 5}
-            linkColor={() => 'rgba(120, 120, 120, 0.6)'}
-            linkOpacity={0.6}
+            linkWidth={link => (link.value || 0.1) * 5}
+            linkColor={() => 'rgba(120, 120, 120, 0.15)'}
+            linkOpacity={0.2}
             onNodeClick={handleNodeClick}
             onNodeDoubleClick={node => {
               // Add node to load queue with high priority
@@ -654,11 +715,23 @@ return (
             nodeCanvasObject={(node, ctx, globalScale) => {
               const label = node.label || getImageName(node.path);
               const fontSize = 12/globalScale;
-              const nodeR = 10;
+              const nodeR = node.isCenter ? 14 : 10;
+              
+              // Color based on level (for extended mode)
+              let nodeColor;
+              if (node.isCenter) {
+                nodeColor = '#ff6b6b';  // Red for center
+              } else if (extendedMode) {
+                // Create a gradient of colors based on level
+                const levelColors = ['#4285F4', '#34A853', '#FBBC05', '#EA4335'];
+                nodeColor = levelColors[node.level % levelColors.length] || '#4285F4';
+              } else {
+                nodeColor = '#4285F4';  // Default blue
+              }
               
               // Draw circle for the node
               ctx.beginPath();
-              ctx.fillStyle = node.isCenter ? '#ff6b6b' : '#4285F4';
+              ctx.fillStyle = nodeColor;
               ctx.arc(node.x, node.y, nodeR, 0, 2 * Math.PI);
               ctx.fill();
               
@@ -679,13 +752,13 @@ return (
                   console.error(`Error rendering image for node ${node.id}:`, err);
                 }
               } else {
-                  // Fallback - render a node with the first letter of filename
-                  const letter = getImageName(node.path).charAt(0).toUpperCase();
-                  ctx.font = `${nodeR}px Sans-Serif`;
-                  ctx.textAlign = 'center';
-                  ctx.textBaseline = 'middle';
-                  ctx.fillStyle = 'white';
-                  ctx.fillText(letter, node.x, node.y);
+                // Fallback - render a node with the first letter of filename
+                const letter = getImageName(node.path).charAt(0).toUpperCase();
+                ctx.font = `${nodeR}px Sans-Serif`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillStyle = 'white';
+                ctx.fillText(letter, node.x, node.y);
               }
               
               // Add border to center node
@@ -697,31 +770,84 @@ return (
                 ctx.stroke();
               }
               
-              // Draw node label when zoomed in
-              if (globalScale >= 0.8) {
-                ctx.font = `${fontSize}px Sans-Serif`;
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'bottom';
-                ctx.fillStyle = 'white';
-                ctx.fillText(label, node.x, node.y - nodeR - 2);
-              }
+              // // Draw node label when zoomed in
+              // if (globalScale >= 0.8) {
+              //   ctx.font = `${fontSize}px Sans-Serif`;
+              //   ctx.textAlign = 'center';
+              //   ctx.textBaseline = 'bottom';
+              //   ctx.fillStyle = 'white';
+              //   ctx.fillText(label, node.x, node.y - nodeR - 2);
+              // }
             }}
             cooldownTicks={100}
             d3AlphaDecay={0.02}
             d3VelocityDecay={0.3}
             backgroundColor="rgba(0,0,0,0)"
             d3Force={(force) => {
+              if (force('center')) {
+                // ForceGraph creates a center force by default, we just modify it
+                force('center')
+                  .x(0)
+                  .y(0)
+                  .strength(5.0);
+              }
+
               // Adjust link force - stronger similarity = closer nodes
               force('link')
-                .distance(link => 100 * (1 - (link.value || 0.5)))
-                .strength(link => 0.7 * (link.value || 0.5));
+                .distance(link => extendedMode ? 
+                  // Extended mode: longer distances to spread out the network
+                  10 * (1 - (link.value || 0.5)) + 90 : 
+                  // Regular mode: tighter clustering
+                  10 * (1 - (link.value || 0.1))
+                )
+                .strength(link => 0.5 * (link.value || 0.3));
               
-              // Configure charge force for clustering
+              // Configure charge force for clustering, reduce strength to avoid too much spread
               force('charge')
-                .strength(-300)
-                .distanceMax(300);
+                .strength(extendedMode ? -300 : -200)
+                .distanceMax(extendedMode ? 200 : 150);
+              
+              // Add collision force for extended mode in a way that doesn't require direct d3 access
+              if (extendedMode) {
+                // If collision force doesn't exist yet, create it
+                if (!force('collision')) {
+                  // Use the ForceGraph's built-in way to add forces
+                  force('collision', () => {});
+                }
+                
+                // Configure the existing collision force
+                force('collision')
+                  .radius(15) // Node radius for collision detection
+                  .strength(0.7); // Strength of the collision force (0-1)
+              } else {
+                // Remove collision force when not in extended mode
+                if (force('collision')) force.remove('collision');
+              }
             }}
           />
+        )}
+        {extendedMode && (
+          <div className="absolute bottom-20 left-4 bg-gray-900/80 backdrop-blur-sm p-2 rounded-lg shadow-lg border border-gray-800 z-20">
+            <div className="text-xs text-gray-400 mb-1">Network Levels:</div>
+            <div className="flex items-center gap-2">
+              <span className="flex items-center">
+                <span className="w-3 h-3 bg-[#ff6b6b] rounded-full mr-1"></span>
+                Center
+              </span>
+              <span className="flex items-center">
+                <span className="w-3 h-3 bg-[#4285F4] rounded-full mr-1"></span>
+                Level 1
+              </span>
+              <span className="flex items-center">
+                <span className="w-3 h-3 bg-[#34A853] rounded-full mr-1"></span>
+                Level 2
+              </span>
+              <span className="flex items-center">
+                <span className="w-3 h-3 bg-[#FBBC05] rounded-full mr-1"></span>
+                Level 3
+              </span>
+            </div>
+          </div>
         )}
       </div>
 
