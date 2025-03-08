@@ -378,14 +378,41 @@ useEffect(() => {
   }
 }, [isAutoLoadingEnabled, processLoadQueue]);
 
-// Handle node click to show modal with details
+const clickTimeoutRef = useRef(null);
+
 const handleNodeClick = useCallback(node => {
-  console.log("Node clicked:", node);
-  if (node && node.path) {
-    setSelectedNode(node);
-    setOpenModal(true);
+  // Clear any existing timeout
+  if (clickTimeoutRef.current) {
+    clearTimeout(clickTimeoutRef.current);
+    clickTimeoutRef.current = null;
   }
+  
+  // Set a new timeout
+  clickTimeoutRef.current = setTimeout(() => {
+    console.log("Node clicked:", node);
+    if (node && node.path) {
+      setSelectedNode(node);
+      setOpenModal(true);
+    }
+    clickTimeoutRef.current = null;
+  }, 750); // 250ms delay - adjust as needed
 }, []);
+
+const handleNodeDoubleClick = useCallback(node => {
+  // Clear the single-click timeout to prevent modal from opening
+  if (clickTimeoutRef.current) {
+    clearTimeout(clickTimeoutRef.current);
+    clickTimeoutRef.current = null;
+  }
+  
+  // Add node to load queue with high priority
+  loadQueue.current = [node.id, ...loadQueue.current];
+  
+  // Start processing queue if not already
+  if (!processingQueue.current) {
+    processLoadQueue();
+  }
+}, [processLoadQueue]);
 
 // Change center image 
 const handleSetAsCenterImage = useCallback(() => {
@@ -701,15 +728,7 @@ return (
             linkColor={() => 'rgba(120, 120, 120, 0.15)'}
             linkOpacity={0.2}
             onNodeClick={handleNodeClick}
-            onNodeDoubleClick={node => {
-              // Add node to load queue with high priority
-              loadQueue.current = [node.id, ...loadQueue.current];
-              
-              // Start processing queue if not already
-              if (!processingQueue.current) {
-                processLoadQueue();
-              }
-            }}
+            onNodeDoubleClick={handleNodeDoubleClick}
             onZoomEnd={throttledViewportChangeHandler}
             onNodeDragEnd={throttledViewportChangeHandler}
             nodeCanvasObject={(node, ctx, globalScale) => {
