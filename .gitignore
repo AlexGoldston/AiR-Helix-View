@@ -1,3 +1,12 @@
 venv
 app.log
 backend/app.log
+backend/__pycache__/config.cpython-310.pyc
+backend/__pycache__/database.cpython-310.pyc
+backend/__pycache__/graph.cpython-310.pyc
+backend/routes/__pycache__/admin_routes.cpython-310.pyc
+backend/routes/__pycache__/api_routes.cpython-310.pyc
+backend/routes/__pycache__/static_routes.cpython-310.pyc
+backend/utils/__pycache__/db_performance.cpython-310.pyc
+backend/utils/__pycache__/image_utils.cpython-310.pyc
+frontend/package-lock.json
