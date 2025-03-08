@@ -378,40 +378,67 @@ useEffect(() => {
   }
 }, [isAutoLoadingEnabled, processLoadQueue]);
 
-const clickTimeoutRef = useRef(null);
+//click tracking cleanup
+useEffect(() => {
+  return () => {
+    if (clickTimerRef.current) {
+      clearTimeout(clickTimerRef.current);
+    }
+  };
+}, []);
+
+const clickNodeRef = useRef(null);
+const clickCountRef = useRef(0);
+const clickTimerRef = useRef(null);
 
 const handleNodeClick = useCallback(node => {
   // Clear any existing timeout
-  if (clickTimeoutRef.current) {
-    clearTimeout(clickTimeoutRef.current);
-    clickTimeoutRef.current = null;
+  if (clickTimerRef.current) {
+    clearTimeout(clickTimerRef.current);
   }
   
-  // Set a new timeout
-  clickTimeoutRef.current = setTimeout(() => {
-    console.log("Node clicked:", node);
-    if (node && node.path) {
-      setSelectedNode(node);
-      setOpenModal(true);
+  // If we clicked the same node within a short time, count it as a double click
+  if (clickNodeRef.current === node.id) {
+    clickCountRef.current += 1;
+    
+    // Double click detected
+    if (clickCountRef.current === 2) {
+      console.log("Double click detected on node:", node);
+      
+      // Add node to load queue with high priority
+      loadQueue.current = [node.id, ...loadQueue.current];
+      
+      // Start processing queue if not already
+      if (!processingQueue.current) {
+        processLoadQueue();
+      }
+      
+      // Reset after handling double click
+      clickNodeRef.current = null;
+      clickCountRef.current = 0;
+      return;
     }
-    clickTimeoutRef.current = null;
-  }, 750); // 250ms delay - adjust as needed
-}, []);
-
-const handleNodeDoubleClick = useCallback(node => {
-  // Clear the single-click timeout to prevent modal from opening
-  if (clickTimeoutRef.current) {
-    clearTimeout(clickTimeoutRef.current);
-    clickTimeoutRef.current = null;
+  } else {
+    // Different node, reset counter
+    clickNodeRef.current = node.id;
+    clickCountRef.current = 1;
   }
   
-  // Add node to load queue with high priority
-  loadQueue.current = [node.id, ...loadQueue.current];
-  
-  // Start processing queue if not already
-  if (!processingQueue.current) {
-    processLoadQueue();
-  }
+  // Set timer for single click action
+  clickTimerRef.current = setTimeout(() => {
+    // Only proceed with single-click action if we haven't detected a double-click
+    if (clickCountRef.current === 1) {
+      console.log("Single click action for node:", node);
+      if (node && node.path) {
+        setSelectedNode(node);
+        setOpenModal(true);
+      }
+    }
+    
+    // Reset state
+    clickNodeRef.current = null;
+    clickCountRef.current = 0;
+  }, 300); // Shorter timer for better responsiveness
 }, [processLoadQueue]);
 
 // Change center image 
@@ -728,7 +755,6 @@ return (
             linkColor={() => 'rgba(120, 120, 120, 0.15)'}
             linkOpacity={0.2}
             onNodeClick={handleNodeClick}
-            onNodeDoubleClick={handleNodeDoubleClick}
             onZoomEnd={throttledViewportChangeHandler}
             onNodeDragEnd={throttledViewportChangeHandler}
             nodeCanvasObject={(node, ctx, globalScale) => {
