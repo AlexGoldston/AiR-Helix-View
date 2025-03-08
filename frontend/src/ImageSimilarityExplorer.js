@@ -58,18 +58,34 @@ const ImageSimilarityExplorer = () => {
       }
       
       const filename = getImageName(path);
+      
+      // Skip if already in cache
+      if (imagesCache.current[path]) {
+        resolve(imagesCache.current[path]);
+        return;
+      }
+      
       const img = new Image();
+      
       img.onload = () => {
         imagesCache.current[path] = img;
         resolve(img);
       };
+      
       img.onerror = (err) => {
         console.error(`Failed to load image: ${path} (${filename})`, err);
         reject(err);
       };
       
-      // Use clean filename without query parameters
+      // Use absolute URL with clean filename
       img.src = `http://localhost:5001/static/${filename}`;
+      
+      // Set a timeout to avoid hanging preloads
+      setTimeout(() => {
+        if (!imagesCache.current[path]) {
+          reject(new Error("Image load timeout"));
+        }
+      }, 5000);
     });
   };
 
@@ -649,6 +665,14 @@ const ImageSimilarityExplorer = () => {
                 } catch (err) {
                   console.error(`Error rendering image for node ${node.id}:`, err);
                 }
+              } else {
+                  // Fallback - render a node with the first letter of filename
+                  const letter = getImageName(node.path).charAt(0).toUpperCase();
+                  ctx.font = `${nodeR}px Sans-Serif`;
+                  ctx.textAlign = 'center';
+                  ctx.textBaseline = 'middle';
+                  ctx.fillStyle = 'white';
+                  ctx.fillText(letter, node.x, node.y);
               }
               
               // Add border to center node
