@@ -92,6 +92,37 @@ const ImageSimilarityExplorer = () => {
     });
   }, [getImageName]);
 
+  // Merge graph data without duplicates
+  const mergeGraphData = useCallback((currentData, newData) => {
+    // Convert newData.edges to expected format
+    const newLinks = newData.edges ? newData.edges.map(edge => ({
+      id: edge.id,
+      source: edge.source,
+      target: edge.target,
+      value: edge.weight
+    })) : [];
+    
+    // Get current node and link IDs
+    const existingNodeIds = new Set(currentData.nodes.map(n => n.id));
+    const existingLinkIds = new Set(currentData.links.map(l => l.id));
+    
+    // Add new nodes that don't already exist
+    const filteredNewNodes = newData.nodes ? 
+      newData.nodes.filter(node => !existingNodeIds.has(node.id)) : 
+      [];
+    
+    // Add new links that don't already exist
+    const filteredNewLinks = newLinks.filter(link => !existingLinkIds.has(link.id));
+    
+    // Return merged data
+    return {
+      nodes: [...currentData.nodes, ...filteredNewNodes],
+      links: [...currentData.links, ...filteredNewLinks]
+    };
+  }, []);
+
+
+
   // Process queue of nodes to load
   const processLoadQueue = useCallback(async () => {
     if (loadQueue.current.length === 0) {
@@ -143,6 +174,34 @@ const ImageSimilarityExplorer = () => {
       
       const data = await response.json();
       
+      // Important fix: Make sure the source node is included in the response
+      // This ensures there's a connection point for the new nodes
+      if (!data.nodes.some(n => n.id === nodeId)) {
+        data.nodes.push({
+          id: nodeId,
+          path: node.path,
+          isCenter: false,
+          level: node.level || 0
+        });
+      }
+      
+      // Ensure connections to the source node
+      data.edges.forEach(edge => {
+        // Make sure at least one end of each edge connects to our source node
+        if (edge.source !== nodeId && edge.target !== nodeId) {
+          // If neither end is our source node, create a new edge to connect
+          const newEdgeId = `e-${nodeId}-${edge.source}`;
+          if (!data.edges.some(e => e.id === newEdgeId)) {
+            data.edges.push({
+              id: newEdgeId,
+              source: nodeId,
+              target: edge.source,
+              weight: 0.6 // Default weight for these connections
+            });
+          }
+        }
+      });
+      
       // Merge with existing data
       const newGraphData = mergeGraphData(graphData, data);
       
@@ -172,7 +231,7 @@ const ImageSimilarityExplorer = () => {
     
     // Process next batch with a short delay
     setTimeout(() => processLoadQueue(), 300);
-  }, [graphData, expandedNodes, getImageName, maxNodesLimit, neighborLimit, preloadImage, similarityThreshold]);
+  }, [graphData, expandedNodes, getImageName, maxNodesLimit, neighborLimit, preloadImage, similarityThreshold, mergeGraphData]);
 
   // Viewport change handler
   const handleViewportChange = useCallback(() => {
@@ -227,38 +286,6 @@ const ImageSimilarityExplorer = () => {
     _.debounce(handleViewportChange, 300),
   [handleViewportChange]
 );
-
-// Merge graph data without duplicates
-const mergeGraphData = useCallback((currentData, newData) => {
-  // Convert newData.edges to expected format
-  const newLinks = newData.edges ? newData.edges.map(edge => ({
-    id: edge.id,
-    source: edge.source,
-    target: edge.target,
-    value: edge.weight
-  })) : [];
-  
-  // Get current node and link IDs
-  const existingNodeIds = new Set(currentData.nodes.map(n => n.id));
-  const existingLinkIds = new Set(currentData.links.map(l => l.id));
-  
-  // Add new nodes that don't already exist
-  const filteredNewNodes = newData.nodes ? 
-    newData.nodes.filter(node => !existingNodeIds.has(node.id)) : 
-    [];
-  
-  // Add new links that don't already exist
-  const filteredNewLinks = newLinks.filter(link => !existingLinkIds.has(link.id));
-  
-  // Return merged data
-  return {
-    nodes: [...currentData.nodes, ...filteredNewNodes],
-    links: [...currentData.links, ...filteredNewLinks]
-  };
-}, []);
-
-
-
 
 // Fetch graph data from API
 useEffect(() => {
