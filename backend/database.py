@@ -1,9 +1,16 @@
 import logging
 import traceback
-from config import NEO4J_URI, NEO4J_USER, NEO4J_PASSWORD
-import os
+import os  # Added this for NEO4J_RUST_EXT_DEBUG
+import neo4j  # Make sure to import the full module
+from config import (
+    NEO4J_URI, NEO4J_USER, NEO4J_PASSWORD,
+    NEO4J_CONNECTION_TIMEOUT, NEO4J_MAX_CONNECTION_LIFETIME,
+    NEO4J_MAX_CONNECTION_POOL_SIZE, NEO4J_CONNECTION_ACQUISITION_TIMEOUT,
+    NEO4J_RUST_EXT_DEBUG
+)
 from dotenv import load_dotenv
 import time
+
 
 logger = logging.getLogger('image-similarity')
 
@@ -20,8 +27,23 @@ def get_db_connection():
     if _db_instance is None:
         try:
             logger.info(f"Initializing Neo4j connection to {NEO4J_URI}")
-            from graph import Neo4jConnection
+            
+            # Import Neo4j driver first
             import neo4j
+            logger.info(f"Using Neo4j driver version {neo4j.__version__}")
+            
+            # Check if Rust extension is available
+            try:
+                import neo4j_rust_ext
+                logger.info(f"Neo4j Rust extension detected (version {neo4j_rust_ext.__version__})")
+                # Log some configuration info 
+                rust_debug = os.environ.get("NEO4J_RUST_EXT_DEBUG", "0")
+                logger.info(f"Rust extension debug mode: {rust_debug == '1'}")
+            except ImportError:
+                logger.info("Neo4j Rust extension not found, using pure Python implementation")
+            
+            # Create the connection
+            from graph import Neo4jConnection
             _db_instance = Neo4jConnection(connection_timeout=5)
             logger.info("Connected to Neo4j database")
             

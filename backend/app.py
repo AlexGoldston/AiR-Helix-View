@@ -11,6 +11,8 @@ import signal
 import atexit
 from concurrent.futures import ThreadPoolExecutor, TimeoutError
 
+os.environ["NEO4J_RUST_EXT_DEBUG"] = "0" 
+
 print("Starting import of modules...")
 
 print("Importing routes...")

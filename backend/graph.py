@@ -1,3 +1,5 @@
+# Add this at the top of graph.py, replacing the existing import
+import neo4j
 from neo4j import GraphDatabase
 import os
 import os.path as op
@@ -6,12 +8,13 @@ from embeddings import ImageEmbedder
 import numpy as np
 import glob
 import logging
+from utils.db_performance import track_query_performance
 
 # Configure logging
 logger = logging.getLogger('image-similarity')
 
 class Neo4jConnection:
-    def __init__(self, connection_timeout=5):
+    def __init__(self, connection_timeout=5, max_connection_lifetime=3600):
         load_dotenv()
         self.uri = os.getenv("NEO4J_URI")
         self.user = os.getenv("NEO4J_USER")
@@ -20,17 +23,41 @@ class Neo4jConnection:
         logger.info(f"Attempting to connect to Neo4j at {self.uri}")
         logger.info(f"Username: {self.user}")
         
+        # Check for Neo4j Rust extension before creating driver
+        rust_extension_available = False
+        try:
+            import neo4j_rust_ext
+            rust_extension_available = True
+            logger.info(f"Using Neo4j Rust extension {neo4j_rust_ext.__version__} for improved performance")
+        except ImportError:
+            logger.info("Neo4j Rust extension not available, using standard Python implementation")
+        
+        # Configure driver options
+        # These optimized settings work especially well with the Rust extension
+        driver_config = {
+            "connection_timeout": connection_timeout,
+            "max_connection_lifetime": max_connection_lifetime,
+            "max_connection_pool_size": 50,  # Increased from default for better parallelism
+            "connection_acquisition_timeout": 60  # Seconds to wait to acquire a connection from pool
+        }
+        
         # Add timeout to driver creation
         self.driver = GraphDatabase.driver(
             self.uri, 
             auth=(self.user, self.password),
-            connection_timeout=connection_timeout
+            **driver_config
         )
 
         # Connection test with timeout
         try:
             self.driver.verify_connectivity()
             logger.info("Successfully connected to Neo4j!")
+            
+            # Log driver details
+            logger.info(f"Neo4j driver details:")
+            logger.info(f"  - Driver version: {neo4j.__version__}")
+            logger.info(f"  - Rust extension: {'Enabled' if rust_extension_available else 'Disabled'}")
+            logger.info(f"  - Connection pool size: {driver_config['max_connection_pool_size']}")
         except Exception as e:
             logger.error(f"Failed to connect to Neo4j: {e}")
             raise
@@ -64,6 +91,7 @@ class Neo4jConnection:
             record = result.single()
             return record["i"]["path"] if record else None
     
+    @track_query_performance(query_type="get_neighbors")
     def get_neighbors(self, image_path, similarity_threshold, limit):
         """
         Get similar image nodes and relationships based on similarity
@@ -159,6 +187,7 @@ class Neo4jConnection:
             
         return result
     
+    @track_query_performance(query_type="get_extended_neighbors")
     def get_extended_neighbors(self, image_path, similarity_threshold, depth=1, limit_per_level=10, max_nodes=100):
         """
         Get multi-level neighbor nodes for deeper graph exploration
