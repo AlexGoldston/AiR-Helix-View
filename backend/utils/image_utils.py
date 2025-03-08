@@ -208,3 +208,26 @@ def verify_image_directory():
             "exists": False,
             "error": str(e)
         }
+
+def image_exists(filename, force_check=False):
+    # Normalize filename
+    filename = normalize_image_path(filename)
+    
+    # Check cache if not forcing a fresh check
+    if not force_check and filename in IMAGE_EXISTENCE_CACHE:
+        return IMAGE_EXISTENCE_CACHE[filename]
+    
+    # Full path construction
+    full_path = os.path.join(IMAGES_DIR, filename)
+    
+    # Direct check with detailed logging
+    logger.debug(f"Checking image existence: {filename}")
+    logger.debug(f"Full path: {full_path}")
+    
+    # Check if file exists
+    exists = os.path.exists(full_path) and os.path.isfile(full_path)
+    
+    # Cache the result
+    IMAGE_EXISTENCE_CACHE[filename] = exists
+    
+    return exists

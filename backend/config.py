@@ -26,7 +26,7 @@ LOG_DATE_FORMAT = '%Y-%m-%d %H:%M:%S'
 LOG_MAX_ENTRIES = 1000
 
 # Explicitly set the images directory
-IMAGES_DIR = r'C:\Users\alexa\dev\AiR-Helix-View\frontend\public\images'
+IMAGES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'frontend', 'public', 'images')
 
 # Verify the directory exists
 if not os.path.exists(IMAGES_DIR):

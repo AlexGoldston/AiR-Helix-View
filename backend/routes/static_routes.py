@@ -47,6 +47,7 @@ def serve_image(filename):
     logger.info("IMAGE REQUEST DETAILS:")
     logger.info(f"Full request URL: {request.url}")
     logger.info(f"Request method: {request.method}")
+    logger.info(f"Full request URL: {request.url}")
     
     # Clean up filename and remove any path components or query parameters
     original_filename = filename

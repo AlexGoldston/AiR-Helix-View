@@ -623,7 +623,51 @@ const ImageSimilarityExplorer = () => {
             onZoomEnd={handleViewportChange}
             onNodeDragEnd={handleViewportChange}
             nodeCanvasObject={(node, ctx, globalScale) => {
-              // Your existing node rendering code...
+              const label = node.label || getImageName(node.path);
+              const fontSize = 12/globalScale;
+              const nodeR = 10;
+              
+              // Draw circle for the node
+              ctx.beginPath();
+              ctx.fillStyle = node.isCenter ? '#ff6b6b' : '#4285F4';
+              ctx.arc(node.x, node.y, nodeR, 0, 2 * Math.PI);
+              ctx.fill();
+              
+              // Draw the image if available
+              if (node.path && imagesCache.current[node.path]) {
+                try {
+                  const img = imagesCache.current[node.path];
+                  const size = nodeR * 2;
+                  ctx.save();
+                  // Create circular clipping path
+                  ctx.beginPath();
+                  ctx.arc(node.x, node.y, nodeR, 0, 2 * Math.PI);
+                  ctx.clip();
+                  // Draw the image
+                  ctx.drawImage(img, node.x - nodeR, node.y - nodeR, size, size);
+                  ctx.restore();
+                } catch (err) {
+                  console.error(`Error rendering image for node ${node.id}:`, err);
+                }
+              }
+              
+              // Add border to center node
+              if (node.isCenter) {
+                ctx.beginPath();
+                ctx.strokeStyle = '#ff0000';
+                ctx.lineWidth = 2 / globalScale;
+                ctx.arc(node.x, node.y, nodeR + 1, 0, 2 * Math.PI);
+                ctx.stroke();
+              }
+              
+              // Draw node label when zoomed in
+              if (globalScale >= 0.8) {
+                ctx.font = `${fontSize}px Sans-Serif`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'bottom';
+                ctx.fillStyle = 'white';
+                ctx.fillText(label, node.x, node.y - nodeR - 2);
+              }
             }}
             cooldownTicks={100}
             d3AlphaDecay={0.02}
