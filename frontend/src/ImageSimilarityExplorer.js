@@ -23,17 +23,17 @@ const ImageSimilarityExplorer = () => {
   const [expandedNodes, setExpandedNodes] = useState(new Set());
   const [isAutoLoadingEnabled, setIsAutoLoadingEnabled] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [viewportBounds, setViewportBounds] = useState(null);
   const [maxNodesLimit, setMaxNodesLimit] = useState(200);
-  const loadQueue = useRef([]);
-  const processingQueue = useRef(false);
   
   // Refs
   const imagesCache = useRef({});
   const graphRef = useRef(null);
+  const loadQueue = useRef([]);
+  const processingQueue = useRef(false);
+  const viewportBoundsRef = useRef(null);
   
   // Extract filename from path
-  const getImageName = (path) => {
+  const getImageName = useCallback((path) => {
     if (!path) return 'unknown';
     
     // Remove any "images/" prefix
@@ -47,10 +47,10 @@ const ImageSimilarityExplorer = () => {
     
     // Get just the filename
     return filename.split('/').pop().split('\\').pop();
-  };
-  
+  }, []);
+   
   // Preload an image and store it in cache
-  const preloadImage = (path) => {
+  const preloadImage = useCallback((path) => {
     return new Promise((resolve, reject) => {
       if (!path) {
         reject(new Error("Invalid path"));
@@ -87,16 +87,98 @@ const ImageSimilarityExplorer = () => {
         }
       }, 5000);
     });
-  };
+  }, [getImageName]);
+
+  // Process queue of nodes to load
+  const processLoadQueue = useCallback(async () => {
+    if (loadQueue.current.length === 0) {
+      processingQueue.current = false;
+      setLoadingMore(false);
+      return;
+    }
+    
+    // If we're at the node limit, stop expanding
+    if (graphData.nodes.length >= maxNodesLimit) {
+      console.log(`Reached max nodes limit (${maxNodesLimit})`);
+      loadQueue.current = [];
+      processingQueue.current = false;
+      setLoadingMore(false);
+      return;
+    }
+    
+    processingQueue.current = true;
+    setLoadingMore(true);
+    
+    // Take first node from the queue
+    const nodeId = loadQueue.current.shift();
+    
+    // Skip if already expanded
+    if (expandedNodes.has(nodeId)) {
+      setLoadingMore(false);
+      setTimeout(() => processLoadQueue(), 50);
+      return;
+    }
+    
+    try {
+      // Find the path for this node
+      const node = graphData.nodes.find(n => n.id === nodeId);
+      if (!node) {
+        setLoadingMore(false);
+        setTimeout(() => processLoadQueue(), 50);
+        return;
+      }
+      
+      // Load neighbors for this node
+      const filename = getImageName(node.path);
+      const response = await fetch(
+        `http://localhost:5001/neighbors?image_path=${encodeURIComponent(filename)}&threshold=${similarityThreshold}&limit=${neighborLimit}`
+      );
+      
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      // Merge with existing data
+      const newGraphData = mergeGraphData(graphData, data);
+      
+      // Update graph data
+      setGraphData(newGraphData);
+      
+      // Mark as expanded
+      setExpandedNodes(prev => {
+        const newSet = new Set(prev);
+        newSet.add(nodeId);
+        return newSet;
+      });
+      
+      // Preload images for new nodes
+      const newNodes = data.nodes.filter(n => 
+        !graphData.nodes.some(existingNode => existingNode.id === n.id)
+      );
+      
+      newNodes.forEach(node => {
+        preloadImage(node.path).catch(() => {});
+      });
+    } catch (error) {
+      console.error(`Error expanding node ${nodeId}:`, error);
+    }
+    
+    setLoadingMore(false);
+    
+    // Process next batch with a short delay
+    setTimeout(() => processLoadQueue(), 300);
+  }, [graphData, expandedNodes, getImageName, maxNodesLimit, neighborLimit, preloadImage, similarityThreshold]);
 
   // Viewport change handler
-  const handleViewportChange = useCallback(_.debounce(() => {
+  const handleViewportChange = useCallback(() => {
     if (!graphRef.current) return;
     
     // Get current viewport information
     const { x, y, k } = graphRef.current.zoom();
     
-    // Use window dimensions as fallback
+    // Use window dimensions
     const width = window.innerWidth;
     const height = window.innerHeight;
     
@@ -108,7 +190,7 @@ const ImageSimilarityExplorer = () => {
       yMax: (height - y) / k + 200
     };
     
-    setViewportBounds(bounds);
+    viewportBoundsRef.current = bounds;
     
     // If auto-loading is enabled, find nodes to expand
     if (isAutoLoadingEnabled && graphData.nodes.length > 0) {
@@ -135,465 +217,396 @@ const ImageSimilarityExplorer = () => {
         }
       }
     }
-  }, 300), [graphData, expandedNodes, isAutoLoadingEnabled]);
+  }, [expandedNodes, graphData.nodes, isAutoLoadingEnabled, processLoadQueue]);
 
-  // Process queue of nodes to load
-  const processLoadQueue = async () => {
-    if (loadQueue.current.length === 0) {
-      processingQueue.current = false;
-      return;
-    }
-    
-    // If we're at the node limit, stop expanding
-    if (graphData.nodes.length >= maxNodesLimit) {
-      console.log(`Reached max nodes limit (${maxNodesLimit})`);
-      loadQueue.current = [];
-      processingQueue.current = false;
-      return;
-    }
-    
-    processingQueue.current = true;
-    setLoadingMore(true);
-    
-    // Take first node from the queue
-    const nodeId = loadQueue.current.shift();
-    
-    // Skip if already expanded
-    if (expandedNodes.has(nodeId)) {
-      setLoadingMore(false);
-      setTimeout(processLoadQueue, 50);
-      return;
-    }
+  // Throttled version of viewport change handler to avoid too many calls
+  const throttledViewportChangeHandler = useCallback(
+    _.debounce(handleViewportChange, 300),
+  [handleViewportChange]
+);
+
+// Merge graph data without duplicates
+const mergeGraphData = useCallback((currentData, newData) => {
+  // Convert newData.edges to expected format
+  const newLinks = newData.edges ? newData.edges.map(edge => ({
+    id: edge.id,
+    source: edge.source,
+    target: edge.target,
+    value: edge.weight
+  })) : [];
+  
+  // Get current node and link IDs
+  const existingNodeIds = new Set(currentData.nodes.map(n => n.id));
+  const existingLinkIds = new Set(currentData.links.map(l => l.id));
+  
+  // Add new nodes that don't already exist
+  const filteredNewNodes = newData.nodes ? 
+    newData.nodes.filter(node => !existingNodeIds.has(node.id)) : 
+    [];
+  
+  // Add new links that don't already exist
+  const filteredNewLinks = newLinks.filter(link => !existingLinkIds.has(link.id));
+  
+  // Return merged data
+  return {
+    nodes: [...currentData.nodes, ...filteredNewNodes],
+    links: [...currentData.links, ...filteredNewLinks]
+  };
+}, []);
+
+// Fetch graph data from API
+useEffect(() => {
+  const fetchData = async () => {
+    setLoading(true);
+    setError(null);
+    setExpandedNodes(new Set());
+    loadQueue.current = [];
     
     try {
-      // Find the path for this node
-      const node = graphData.nodes.find(n => n.id === nodeId);
-      if (!node) {
-        setLoadingMore(false);
-        setTimeout(processLoadQueue, 50);
-        return;
-      }
+      console.log(`Fetching data for ${centerImage} with threshold ${similarityThreshold} and limit ${neighborLimit}`);
       
-      // Load neighbors for this node
-      const filename = getImageName(node.path);
-      const response = await fetch(
-        `http://localhost:5001/neighbors?image_path=${encodeURIComponent(filename)}&threshold=${similarityThreshold}&limit=${neighborLimit}`
-      );
+      // Call the backend API with just the filename
+      const filename = getImageName(centerImage);
+      const response = await fetch(`http://localhost:5001/neighbors?image_path=${encodeURIComponent(filename)}&threshold=${similarityThreshold}&limit=${neighborLimit}`);
       
       if (!response.ok) {
         throw new Error(`API error: ${response.status}`);
       }
       
-      const data = await response.json();
+      const apiData = await response.json();
+      console.log("API response:", apiData);
+      setDebugData(apiData);
       
-      // Merge with existing data
-      const newGraphData = mergeGraphData(graphData, data);
+      // Check if we received valid data
+      if (!apiData.nodes || !apiData.edges) {
+        console.error("Invalid data structure from API", apiData);
+        throw new Error("Invalid data structure from API");
+      }
+
+      // Transform the API response to match ForceGraph expected format
+      const graphData = {
+        nodes: [],
+        links: []
+      };
+
+      // Find center node and mark as expanded
+      const centerNode = apiData.nodes.find(node => node.isCenter);
+      if (centerNode) {
+        // Add to expanded nodes set since center is already expanded
+        setExpandedNodes(new Set([centerNode.id]));
+      }
       
-      // Update graph data
-      setGraphData(newGraphData);
+      // Process all nodes from the API response
+      for (const node of apiData.nodes) {
+        graphData.nodes.push({
+          id: node.id,
+          path: node.path,
+          label: node.label || getImageName(node.path),
+          isCenter: node.isCenter || false
+        });
+      }
       
-      // Mark as expanded
-      setExpandedNodes(prev => new Set([...prev, nodeId]));
+      // Process all edges from the API response
+      for (const edge of apiData.edges) {
+        graphData.links.push({
+          id: edge.id,
+          source: edge.source,
+          target: edge.target,
+          value: edge.weight
+        });
+      }
       
-      // Preload images for new nodes
-      const newNodes = data.nodes.filter(n => 
-        !graphData.nodes.some(existingNode => existingNode.id === n.id)
+      console.log("Processed graph data:", graphData);
+      
+      // Preload images for better rendering
+      const preloadPromises = graphData.nodes.map(node => 
+        preloadImage(node.path).catch(() => console.warn(`Failed to preload image: ${node.path}`))
       );
       
-      newNodes.forEach(node => {
-        preloadImage(node.path).catch(() => {});
-      });
-    } catch (error) {
-      console.error(`Error expanding node ${nodeId}:`, error);
-    }
-    
-    setLoadingMore(false);
-    
-    // Process next batch with a short delay
-    setTimeout(processLoadQueue, 300);
-  };
-  
-  // Merge graph data without duplicates
-  const mergeGraphData = (currentData, newData) => {
-    // Convert newData.edges to expected format
-    const newLinks = newData.edges ? newData.edges.map(edge => ({
-      id: edge.id,
-      source: edge.source,
-      target: edge.target,
-      value: edge.weight
-    })) : [];
-    
-    // Get current node and link IDs
-    const existingNodeIds = new Set(currentData.nodes.map(n => n.id));
-    const existingLinkIds = new Set(currentData.links.map(l => l.id));
-    
-    // Add new nodes that don't already exist
-    const filteredNewNodes = newData.nodes ? 
-      newData.nodes.filter(node => !existingNodeIds.has(node.id)) : 
-      [];
-    
-    // Add new links that don't already exist
-    const filteredNewLinks = newLinks.filter(link => !existingLinkIds.has(link.id));
-    
-    // Return merged data
-    return {
-      nodes: [...currentData.nodes, ...filteredNewNodes],
-      links: [...currentData.links, ...filteredNewLinks]
-    };
-  };
-
-  // Fetch graph data from API
-  useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
-      setError(null);
-
-      setExpandedNodes(new Set());
+      await Promise.allSettled(preloadPromises);
+      setGraphData(graphData);
       
-      try {
-        console.log(`Fetching data for ${centerImage} with threshold ${similarityThreshold} and limit ${neighborLimit}`);
-        
-        // Call the backend API with just the filename
-        const filename = getImageName(centerImage);
-        const response = await fetch(`http://localhost:5001/neighbors?image_path=${encodeURIComponent(filename)}&threshold=${similarityThreshold}&limit=${neighborLimit}`);
-        
-        if (!response.ok) {
-          throw new Error(`API error: ${response.status}`);
-        }
-        
-        const apiData = await response.json();
-        console.log("API response:", apiData);
-        setDebugData(apiData);
-        
-        // Check if we received valid data
-        if (!apiData.nodes || !apiData.edges) {
-          console.error("Invalid data structure from API", apiData);
-          throw new Error("Invalid data structure from API");
-        }
-
-        // Transform the API response to match ForceGraph expected format
-        const graphData = {
-          nodes: [],
-          links: []
-        };
-
-        //find centre node and mark as expanded
-        const centerNode = apiData.nodes.find(node => node.isCenter);
-        if (centerNode) {
-          // Add to expanded nodes set since center is already expanded
-          setExpandedNodes(new Set([centerNode.id]));
-        }
-        
-        // Process all nodes from the API response
-        for (const node of apiData.nodes) {
-          graphData.nodes.push({
-            id: node.id,
-            path: node.path,
-            label: node.label || getImageName(node.path),
-            isCenter: node.isCenter || false
-          });
-        }
-        
-        // Process all edges from the API response
-        for (const edge of apiData.edges) {
-          graphData.links.push({
-            id: edge.id,
-            source: edge.source,
-            target: edge.target,
-            value: edge.weight
-          });
-        }
-        
-        console.log("Processed graph data:", graphData);
-        
-        // Preload images for better rendering
-        const preloadPromises = graphData.nodes.map(node => 
-          preloadImage(node.path).catch(() => console.warn(`Failed to preload image: ${node.path}`))
-        );
-        
-        await Promise.allSettled(preloadPromises);
-        setGraphData(graphData);
-        
-        // Adjust graph physics after setting data
-        if (graphRef.current) {
-          setTimeout(() => {
-            if (graphRef.current.d3Force('charge')) {
-              graphRef.current.d3Force('charge').strength(-500);
-            }
-            if (graphRef.current.d3Force('link')) {
-              graphRef.current.d3Force('link').distance(150);
-            }
-            graphRef.current.zoomToFit(1000);
-          }, 1000);
-        }
-      } catch (err) {
-        console.error("Error fetching graph data:", err);
-        setError(err.message);
-      } finally {
-        setLoading(false);
+      // Adjust graph physics after setting data
+      if (graphRef.current) {
+        setTimeout(() => {
+          if (graphRef.current.d3Force('charge')) {
+            graphRef.current.d3Force('charge').strength(-500);
+          }
+          if (graphRef.current.d3Force('link')) {
+            graphRef.current.d3Force('link').distance(150);
+          }
+          graphRef.current.zoomToFit(1000);
+        }, 1000);
       }
-    };
-    
-    fetchData();
-  }, [centerImage, similarityThreshold, neighborLimit]);
-  
-  // Add this useEffect hook below your existing hooks
-  useEffect(() => {
-    if (graphRef.current) {
-      // Initial viewport calculation
-      setTimeout(handleViewportChange, 500);
+    } catch (err) {
+      console.error("Error fetching graph data:", err);
+      setError(err.message);
+    } finally {
+      setLoading(false);
     }
-  }, [graphData, handleViewportChange]);
+  };
+  
+  fetchData();
+}, [centerImage, similarityThreshold, neighborLimit, getImageName, preloadImage]);
 
-  // Effect to reprocess queue when auto-loading changes
-  useEffect(() => {
-    if (isAutoLoadingEnabled && loadQueue.current.length > 0 && !processingQueue.current) {
-      processLoadQueue();
-    }
-  }, [isAutoLoadingEnabled]);
+// Effect to calculate initial viewport
+useEffect(() => {
+  if (graphRef.current) {
+    // Initial viewport calculation
+    setTimeout(throttledViewportChangeHandler, 500);
+  }
+}, [graphData, throttledViewportChangeHandler]);
 
-  // Handle node click to show modal with details
-  const handleNodeClick = useCallback(node => {
-    console.log("Node clicked:", node);
-    if (node && node.path) {
-      setSelectedNode(node);
-      setOpenModal(true);
-    }
-  }, []);
+// Effect to process queue when auto-loading changes
+useEffect(() => {
+  if (isAutoLoadingEnabled && loadQueue.current.length > 0 && !processingQueue.current) {
+    processLoadQueue();
+  }
+}, [isAutoLoadingEnabled, processLoadQueue]);
+
+// Handle node click to show modal with details
+const handleNodeClick = useCallback(node => {
+  console.log("Node clicked:", node);
+  if (node && node.path) {
+    setSelectedNode(node);
+    setOpenModal(true);
+  }
+}, []);
+
+// Change center image 
+const handleSetAsCenterImage = useCallback(() => {
+  if (selectedNode && !selectedNode.isCenter) {
+    setCenterImage(selectedNode.path);
+    setOpenModal(false);
+  }
+}, [selectedNode]);
+
+// Helper function to get similarity value for a node
+const getSimilarity = useCallback((node, data) => {
+  if (node.isCenter) return 1;
   
-  // Change center image 
-  const handleSetAsCenterImage = useCallback(() => {
-    if (selectedNode && !selectedNode.isCenter) {
-      setCenterImage(selectedNode.path);
-      setOpenModal(false);
+  const link = data.links.find(link => {
+    if (typeof link.source === 'object' && typeof link.target === 'object') {
+      return (link.source.id === node.id || link.target.id === node.id);
     }
-  }, [selectedNode]);
+    return (link.source === node.id || link.target === node.id);
+  });
   
-  // Helper function to get similarity value for a node
-  const getSimilarity = (node, data) => {
-    if (node.isCenter) return 1;
-    
-    const link = data.links.find(link => {
-      if (typeof link.source === 'object' && typeof link.target === 'object') {
-        return (link.source.id === node.id || link.target.id === node.id);
-      }
-      return (link.source === node.id || link.target === node.id);
+  return link ? link.value : null;
+}, []);
+
+// Reset zoom function
+const handleResetZoom = useCallback(() => {
+  if (graphRef.current) {
+    graphRef.current.zoomToFit(500);
+  }
+}, []);
+
+// Zoom in function
+const handleZoomIn = useCallback(() => {
+  if (graphRef.current) {
+    const currentZoom = graphRef.current.zoom();
+    graphRef.current.zoom(currentZoom * 1.2, 400);
+  }
+}, []);
+
+// Zoom out function
+const handleZoomOut = useCallback(() => {
+  if (graphRef.current) {
+    const currentZoom = graphRef.current.zoom();
+    graphRef.current.zoom(currentZoom / 1.2, 400);
+  }
+}, []);
+
+// Reset expanded nodes
+const clearGraph = useCallback(() => {
+  setExpandedNodes(new Set());
+  loadQueue.current = [];
+  // Reset to only the center node
+  const centerNode = graphData.nodes.find(n => n.isCenter);
+  if (centerNode) {
+    setGraphData({
+      nodes: [centerNode],
+      links: []
     });
+  }
+}, [graphData.nodes]);
+
+// Reset view to center
+const resetView = useCallback(() => {
+  if (graphRef.current) {
+    graphRef.current.zoomToFit(400);
+  }
+}, []);
+
+// Toggle automatic loading
+const toggleAutomaticLoading = useCallback(() => {
+  setIsAutoLoadingEnabled(prev => !prev);
+}, []);
+
+return (
+  <div className="relative flex flex-col h-screen w-full overflow-hidden">
+    {/* Animated Background */}
+    <div 
+      className="absolute inset-0 w-full h-full bg-gray-950 overflow-hidden z-0 pointer-events-none"
+      style={{
+        background: `
+          radial-gradient(circle at 0% 0%, rgba(45, 55, 72, 0.1) 0%, transparent 50%),
+          radial-gradient(circle at 100% 0%, rgba(49, 130, 206, 0.05) 0%, transparent 50%),
+          radial-gradient(circle at 100% 100%, rgba(76, 81, 191, 0.1) 0%, transparent 50%),
+          radial-gradient(circle at 0% 100%, rgba(66, 153, 225, 0.05) 0%, transparent 50%),
+          #0f1117
+        `
+      }}
+    >
+      {/* SVG Animated Gradient */}
+      <svg width="100%" height="100%" className="opacity-20">
+        <defs>
+          <filter id="gooey" height="300%" width="100%" x="-50%" y="-100%">
+            <feGaussianBlur in="SourceGraphic" stdDeviation="10" result="blur" />
+            <feColorMatrix in="blur" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 30 -11" result="gooey" />
+          </filter>
+          <linearGradient id="gradient1" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#4285F4" stopOpacity="0.2">
+              <animate attributeName="stop-color" values="#4285F4;#34A853;#FBBC05;#EA4335;#4285F4" dur="20s" repeatCount="indefinite" />
+            </stop>
+            <stop offset="100%" stopColor="#34A853" stopOpacity="0.2">
+              <animate attributeName="stop-color" values="#34A853;#FBBC05;#EA4335;#4285F4;#34A853" dur="20s" repeatCount="indefinite" />
+            </stop>
+          </linearGradient>
+        </defs>
+        <g filter="url(#gooey)">
+          <circle cx="25%" cy="25%" r="25%" fill="url(#gradient1)">
+            <animate attributeName="cx" values="25%;75%;25%" dur="30s" repeatCount="indefinite" />
+            <animate attributeName="cy" values="25%;75%;25%" dur="30s" repeatCount="indefinite" />
+          </circle>
+          <circle cx="75%" cy="75%" r="25%" fill="url(#gradient1)">
+            <animate attributeName="cx" values="75%;25%;75%" dur="30s" repeatCount="indefinite" />
+            <animate attributeName="cy" values="75%;25%;75%" dur="30s" repeatCount="indefinite" />
+          </circle>
+        </g>
+      </svg>
+    </div>
     
-    return link ? link.value : null;
-  };
-  
-  // Reset zoom function
-  const handleResetZoom = () => {
-    if (graphRef.current) {
-      graphRef.current.zoomToFit(500);
-    }
-  };
-  
-  // Zoom in function
-  const handleZoomIn = () => {
-    if (graphRef.current) {
-      const currentZoom = graphRef.current.zoom();
-      graphRef.current.zoom(currentZoom * 1.2, 400);
-    }
-  };
-  
-  // Zoom out function
-  const handleZoomOut = () => {
-    if (graphRef.current) {
-      const currentZoom = graphRef.current.zoom();
-      graphRef.current.zoom(currentZoom / 1.2, 400);
-    }
-  };
-
-  // Reset expanded nodes
-  const clearGraph = () => {
-    setExpandedNodes(new Set());
-    // Reset to only the center node
-    const centerNode = graphData.nodes.find(n => n.isCenter);
-    if (centerNode) {
-      setGraphData({
-        nodes: [centerNode],
-        links: []
-      });
-    }
-  };
-
-  // Reset view to center
-  const resetView = () => {
-    if (graphRef.current) {
-      graphRef.current.zoomToFit(400);
-    }
-  };
-
-  // Toggle automatic loading
-  const toggleAutomaticLoading = () => {
-    setIsAutoLoadingEnabled(!isAutoLoadingEnabled);
-  };
-
-  return (
-    <div className="relative flex flex-col h-screen w-full overflow-hidden">
-      {/* Animated Background */}
-      <div 
-        className="absolute inset-0 w-full h-full bg-gray-950 overflow-hidden z-0 pointer-events-none"
-        style={{
-          background: `
-            radial-gradient(circle at 0% 0%, rgba(45, 55, 72, 0.1) 0%, transparent 50%),
-            radial-gradient(circle at 100% 0%, rgba(49, 130, 206, 0.05) 0%, transparent 50%),
-            radial-gradient(circle at 100% 100%, rgba(76, 81, 191, 0.1) 0%, transparent 50%),
-            radial-gradient(circle at 0% 100%, rgba(66, 153, 225, 0.05) 0%, transparent 50%),
-            #0f1117
-          `
-        }}
-      >
-        {/* SVG Animated Gradient */}
-        <svg width="100%" height="100%" className="opacity-20">
-          <defs>
-            <filter id="gooey" height="300%" width="100%" x="-50%" y="-100%">
-              <feGaussianBlur in="SourceGraphic" stdDeviation="10" result="blur" />
-              <feColorMatrix in="blur" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 30 -11" result="gooey" />
-            </filter>
-            <linearGradient id="gradient1" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor="#4285F4" stopOpacity="0.2">
-                <animate attributeName="stop-color" values="#4285F4;#34A853;#FBBC05;#EA4335;#4285F4" dur="20s" repeatCount="indefinite" />
-              </stop>
-              <stop offset="100%" stopColor="#34A853" stopOpacity="0.2">
-                <animate attributeName="stop-color" values="#34A853;#FBBC05;#EA4335;#4285F4;#34A853" dur="20s" repeatCount="indefinite" />
-              </stop>
-            </linearGradient>
-          </defs>
-          <g filter="url(#gooey)">
-            <circle cx="25%" cy="25%" r="25%" fill="url(#gradient1)">
-              <animate attributeName="cx" values="25%;75%;25%" dur="30s" repeatCount="indefinite" />
-              <animate attributeName="cy" values="25%;75%;25%" dur="30s" repeatCount="indefinite" />
-            </circle>
-            <circle cx="75%" cy="75%" r="25%" fill="url(#gradient1)">
-              <animate attributeName="cx" values="75%;25%;75%" dur="30s" repeatCount="indefinite" />
-              <animate attributeName="cy" values="75%;25%;75%" dur="30s" repeatCount="indefinite" />
-            </circle>
-          </g>
-        </svg>
-      </div>
-      
-      {/* Top Navigation */}
-      <div className="z-10 flex items-center justify-between p-4 bg-gray-950/80 backdrop-blur-sm border-b border-gray-800">
-        <div className="flex items-center">
-          <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
-            <SheetTrigger asChild>
-              <Button variant="ghost" size="icon" className="mr-2">
-                <Menu className="h-5 w-5" />
-              </Button>
-            </SheetTrigger>
-            <SheetContent side="left" className="w-80 bg-gray-950 border-r border-gray-800">
-              <SheetHeader>
-                <SheetTitle className="text-2xl font-bold bg-gradient-to-r from-blue-500 to-teal-400 bg-clip-text text-transparent">Controls</SheetTitle>
-              </SheetHeader>
+    {/* Top Navigation */}
+    <div className="z-10 flex items-center justify-between p-4 bg-gray-950/80 backdrop-blur-sm border-b border-gray-800">
+      <div className="flex items-center">
+        <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
+          <SheetTrigger asChild>
+            <Button variant="ghost" size="icon" className="mr-2">
+              <Menu className="h-5 w-5" />
+            </Button>
+          </SheetTrigger>
+          <SheetContent side="left" className="w-80 bg-gray-950 border-r border-gray-800">
+            <SheetHeader>
+              <SheetTitle className="text-2xl font-bold bg-gradient-to-r from-blue-500 to-teal-400 bg-clip-text text-transparent">Controls</SheetTitle>
+            </SheetHeader>
+            
+            <div className="py-6 space-y-6">
+              <div>
+                <h3 className="mb-4 text-lg font-medium">Current Image</h3>
+                <div className="bg-gray-900 rounded-lg p-2 mb-4">
+                  <img 
+                    src={`http://localhost:5001/static/${getImageName(centerImage)}`}
+                    alt={getImageName(centerImage)}
+                    className="w-full h-48 object-contain rounded-md border border-gray-800"
+                    onError={(e) => {
+                      e.target.onerror = null;
+                      e.target.src = "/api/placeholder/200/120";
+                    }}
+                  />
+                  <p className="mt-2 text-sm text-gray-400 text-center truncate">{getImageName(centerImage)}</p>
+                </div>
+              </div>
               
-              <div className="py-6 space-y-6">
+              <div className="space-y-4">
                 <div>
-                  <h3 className="mb-4 text-lg font-medium">Current Image</h3>
-                  <div className="bg-gray-900 rounded-lg p-2 mb-4">
-                    <img 
-                      src={`http://localhost:5001/static/${getImageName(centerImage)}`}
-                      alt={getImageName(centerImage)}
-                      className="w-full h-48 object-contain rounded-md border border-gray-800"
-                      onError={(e) => {
-                        e.target.onerror = null;
-                        e.target.src = "/api/placeholder/200/120";
-                      }}
-                    />
-                    <p className="mt-2 text-sm text-gray-400 text-center truncate">{getImageName(centerImage)}</p>
-                  </div>
-                </div>
-                
-                <div className="space-y-4">
-                  <div>
-                    <label className="text-sm font-medium text-gray-400 mb-2 block">
-                      Similarity Threshold: {similarityThreshold.toFixed(2)}
-                    </label>
-                    <Slider 
-                      defaultValue={[similarityThreshold]} 
-                      min={0.5} 
-                      max={0.99} 
-                      step={0.01}
-                      onValueChange={(values) => setSimilarityThreshold(values[0])}
-                      className="w-full"
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="text-sm font-medium text-gray-400 mb-2 block">
-                      Max Neighbors: {neighborLimit}
-                    </label>
-                    <Slider 
-                      defaultValue={[neighborLimit]} 
-                      min={5} 
-                      max={50} 
-                      step={5}
-                      onValueChange={(values) => setNeighborLimit(values[0])}
-                      className="w-full"
-                    />
-                  </div>
-                </div>
-                
-                <div className="pt-4">
-                  <Button 
-                    variant="outline"
+                  <label className="text-sm font-medium text-gray-400 mb-2 block">
+                    Similarity Threshold: {similarityThreshold.toFixed(2)}
+                  </label>
+                  <Slider 
+                    defaultValue={[similarityThreshold]} 
+                    min={0.5} 
+                    max={0.99} 
+                    step={0.01}
+                    onValueChange={(values) => setSimilarityThreshold(values[0])}
                     className="w-full"
-                    onClick={() => setDebugData(debugData || { nodes: [], edges: [] })}
-                  >
-                    Toggle Debug Panel
-                  </Button>
+                  />
                 </div>
                 
-                <div className="pt-4 border-t border-gray-800">
+                <div>
+                  <label className="text-sm font-medium text-gray-400 mb-2 block">
+                    Max Neighbors: {neighborLimit}
+                  </label>
+                  <Slider 
+                    defaultValue={[neighborLimit]} 
+                    min={5} 
+                    max={50} 
+                    step={5}
+                    onValueChange={(values) => setNeighborLimit(values[0])}
+                    className="w-full"
+                  />
+                </div>
+              </div>
+              
+              <div className="pt-4">
+                <Button 
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => setDebugData(debugData || { nodes: [], edges: [] })}
+                >
+                  Toggle Debug Panel
+                </Button>
+              </div>
+              
+              <div className="pt-4 border-t border-gray-800">
+                <Button 
+                  variant="outline"
+                  size="sm"
+                  onClick={handleResetZoom}
+                  className="w-full mb-2"
+                >
+                  Reset Zoom
+                </Button>
+                
+                <div className="flex gap-2">
                   <Button 
                     variant="outline"
                     size="sm"
-                    onClick={handleResetZoom}
-                    className="w-full mb-2"
+                    onClick={handleZoomIn}
+                    className="flex-1"
                   >
-                    Reset Zoom
+                    <ZoomIn className="h-4 w-4 mr-1" /> Zoom In
                   </Button>
                   
-                  <div className="flex gap-2">
-                    <Button 
-                      variant="outline"
-                      size="sm"
-                      onClick={handleZoomIn}
-                      className="flex-1"
-                    >
-                      <ZoomIn className="h-4 w-4 mr-1" /> Zoom In
-                    </Button>
-                    
-                    <Button 
-                      variant="outline"
-                      size="sm"
-                      onClick={handleZoomOut}
-                      className="flex-1"
-                    >
-                      <ZoomOut className="h-4 w-4 mr-1" /> Zoom Out
-                    </Button>
-                  </div>
+                  <Button 
+                    variant="outline"
+                    size="sm"
+                    onClick={handleZoomOut}
+                    className="flex-1"
+                  >
+                    <ZoomOut className="h-4 w-4 mr-1" /> Zoom Out
+                  </Button>
                 </div>
               </div>
-            </SheetContent>
-          </Sheet>
-          
-          <h1 className="text-xl font-bold bg-gradient-to-r from-blue-500 to-teal-400 bg-clip-text text-transparent">
-            AiR-Helix-View
-          </h1>
-        </div>
+            </div>
+          </SheetContent>
+        </Sheet>
         
-        <div className="flex items-center space-x-2">
-          <Button variant="ghost" size="sm" onClick={() => setSidebarOpen(true)}>
-            <Info className="h-4 w-4 mr-1" /> Controls
-          </Button>
-        </div>
+        <h1 className="text-xl font-bold bg-gradient-to-r from-blue-500 to-teal-400 bg-clip-text text-transparent">
+          AiR-Helix-View
+        </h1>
       </div>
       
-      {/* Main Content */}
-      <div className="flex-1 relative z-10">
+      <div className="flex items-center space-x-2">
+        <Button variant="ghost" size="sm" onClick={() => setSidebarOpen(true)}>
+          <Info className="h-4 w-4 mr-1" /> Controls
+        </Button>
+      </div>
+    </div>
+
+    {/* Main Content */}
+    <div className="flex-1 relative z-10">
         {loading && (
           <div className="absolute inset-0 flex items-center justify-center bg-gray-900/50 backdrop-blur-sm z-20">
             <div className="bg-gray-800 p-4 rounded-lg shadow-lg">
@@ -636,8 +649,8 @@ const ImageSimilarityExplorer = () => {
                 processLoadQueue();
               }
             }}
-            onZoomEnd={handleViewportChange}
-            onNodeDragEnd={handleViewportChange}
+            onZoomEnd={throttledViewportChangeHandler}
+            onNodeDragEnd={throttledViewportChangeHandler}
             nodeCanvasObject={(node, ctx, globalScale) => {
               const label = node.label || getImageName(node.path);
               const fontSize = 12/globalScale;
@@ -711,7 +724,7 @@ const ImageSimilarityExplorer = () => {
           />
         )}
       </div>
-      
+
       {/* Debug Panel */}
       {debugData && (
         <div className="absolute top-16 right-4 w-80 bg-gray-900/90 backdrop-blur-sm p-4 rounded-lg shadow-lg border border-gray-800 max-h-[80vh] overflow-auto z-20">
@@ -800,11 +813,10 @@ const ImageSimilarityExplorer = () => {
                       )}
                     </div>
                   </div>
-                  
                   <div className="mt-4 flex flex-col space-y-2">
                     {!selectedNode.isCenter && (
                       <Button 
-                        variant="default" 
+                        variant="default"
                         onClick={handleSetAsCenterImage}
                       >
                         Set as Center Image
@@ -840,7 +852,7 @@ const ImageSimilarityExplorer = () => {
         resetView={resetView}
         maxNodesSliderValue={maxNodesLimit}
         setMaxNodesSliderValue={setMaxNodesLimit}
-      />
+        />
     </div>
   );
 };
