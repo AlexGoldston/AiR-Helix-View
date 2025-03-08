@@ -7,6 +7,8 @@ import traceback
 import sys
 import threading
 import time
+import signal
+import atexit
 from concurrent.futures import ThreadPoolExecutor, TimeoutError
 
 print("Starting import of modules...")
@@ -32,6 +34,11 @@ logging.basicConfig(
 )
 logger = logging.getLogger('image-similarity')
 logger.info("Basic logging initialized")
+
+# Global references for proper shutdown
+server = None
+server_thread = None
+shutdown_requested = False
 
 def create_app():
     """Create and configure the Flask application"""
@@ -87,8 +94,86 @@ def create_app():
         traceback.print_exc()
         raise
 
+def close_logging_handlers():
+    """Close all logging handlers to release file handles"""
+    print("Closing logging handlers...")
+    
+    # Close all handlers for our logger
+    for handler in logger.handlers[:]:
+        try:
+            handler.flush()
+            handler.close()
+            logger.removeHandler(handler)
+        except Exception as e:
+            print(f"Error closing logger handler: {e}")
+    
+    # Close root logger handlers too
+    root_logger = logging.getLogger()
+    for handler in root_logger.handlers[:]:
+        try:
+            handler.flush()
+            handler.close()
+            root_logger.removeHandler(handler)
+        except Exception as e:
+            print(f"Error closing root logger handler: {e}")
+    
+    # Be extra sure by closing all loggers
+    for name in logging.root.manager.loggerDict:
+        log = logging.getLogger(name)
+        for handler in log.handlers[:]:
+            try:
+                handler.flush()
+                handler.close()
+                log.removeHandler(handler)
+            except Exception as e:
+                print(f"Error closing handler for logger {name}: {e}")
+
+def shutdown_server():
+    """Properly shutdown the server and clean up resources"""
+    global server, server_thread, shutdown_requested
+    
+    if shutdown_requested:
+        return
+    
+    shutdown_requested = True
+    print("Shutting down server...")
+    
+    # First try to stop the server gracefully
+    if server:
+        try:
+            server.shutdown()
+            print("Server shutdown initiated")
+        except Exception as e:
+            print(f"Error during server shutdown: {e}")
+    
+    # Close all logging handlers
+    close_logging_handlers()
+    
+    # Force exit after a brief delay if we're still running
+    def force_exit():
+        time.sleep(1)  # Give a second for shutdown to complete
+        print("Forcing exit...")
+        os._exit(0)  # Hard exit
+    
+    # Start force exit thread
+    threading.Thread(target=force_exit, daemon=True).start()
+
+def signal_handler(sig, frame):
+    """Handle interrupt signals"""
+    print("\nCaught signal - shutting down...")
+    shutdown_server()
+
 def main():
+    global server, server_thread
+    
     try:
+        # Set up signal handlers for graceful shutdown
+        signal.signal(signal.SIGINT, signal_handler)
+        signal.signal(signal.SIGTERM, signal_handler)
+        
+        # Register shutdown function with atexit
+        atexit.register(shutdown_server)
+        
         print("Starting main function...")
         logger.info("Starting main function")
         
@@ -106,22 +191,17 @@ def main():
         from werkzeug.serving import make_server
         server = make_server('127.0.0.1', 5001, app)
 
-        #run in separate thread
+        # Run in separate thread
         server_thread = threading.Thread(target=server.serve_forever)
         server_thread.daemon = True
         server_thread.start()
 
         print('Flask server started - press ctrl+c to stop')
+        
         # Run until interrupted
-        try:
-            # Keep the main thread running
-            while server_thread.is_alive():
-                server_thread.join(1)  # Check every second
-        except KeyboardInterrupt:
-            print("Shutting down server...")
-            server.shutdown()
-            print("Server shutdown complete")
-    
+        while server_thread.is_alive() and not shutdown_requested:
+            time.sleep(1)  # Check every second
+            
     except Exception as e:
         print(f"Critical error during app startup: {str(e)}")
         logger.error(f"Critical error during app startup: {str(e)}")
