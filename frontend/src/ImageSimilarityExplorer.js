@@ -11,7 +11,7 @@ import _ from 'lodash';
 const ImageSimilarityExplorer = () => {
   // State management
   const [graphData, setGraphData] = useState({ nodes: [], links: [] });
-  const [centerImage, setCenterImage] = useState('allianz_stadium_sydney01.jpg');
+  const [centerImage, setCenterImage] = useState('2147121972.jpg');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [similarityThreshold, setSimilarityThreshold] = useState(0.63);
@@ -23,7 +23,7 @@ const ImageSimilarityExplorer = () => {
   const [expandedNodes, setExpandedNodes] = useState(new Set());
   const [isAutoLoadingEnabled, setIsAutoLoadingEnabled] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [maxNodesLimit, setMaxNodesLimit] = useState(200);
+  const [maxNodesLimit, setMaxNodesLimit] = useState(500);
   const [extendedMode, setExtendedMode] = useState(true);  // Enable by default
   const [neighborDepth, setNeighborDepth] = useState(2);
   const [limitPerLevel, setLimitPerLevel] = useState(10);
@@ -816,7 +816,15 @@ return (
           <ForceGraph2D
             ref={graphRef}
             graphData={graphData}
-            nodeLabel={node => `${getImageName(node.path)} ${node.isCenter ? '' : `(Similarity: ${(getSimilarity(node, graphData) * 100).toFixed(0)}%)`}`}
+            nodeLabel={node => {
+              // Create a shortened description preview (max 50 chars) if available
+              const descriptionPreview = node.description 
+                ? `${node.description.substring(0, 50)}${node.description.length > 50 ? '...' : ''}`
+                : 'No description';
+                
+              return `${getImageName(node.path)} ${node.isCenter ? '' : `(Similarity: ${(getSimilarity(node, graphData) * 100).toFixed(0)}%)`}
+            ${descriptionPreview}`;
+            }}
             nodeColor={node => node.isCenter ? '#ff6b6b' : '#4285F4'}
             linkWidth={link => (link.value || 0.1) * 5}
             linkColor={() => 'rgba(120, 120, 120, 0.15)'}
@@ -977,6 +985,14 @@ return (
                 <pre className="bg-gray-800 p-2 rounded text-xs overflow-x-auto">
                   {JSON.stringify(debugData.nodes[0], null, 2)}
                 </pre>
+                {debugData.nodes[0].description && (
+                  <div className="mt-2">
+                    <h4 className="text-green-400 mb-1">Node Description:</h4>
+                    <div className="bg-gray-800 p-2 rounded text-xs">
+                      {debugData.nodes[0].description}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
             
@@ -1041,6 +1057,14 @@ return (
                       <p><span className="text-gray-400">Node ID:</span> {selectedNode.id}</p>
                       <p><span className="text-gray-400">Type:</span> {selectedNode.isCenter ? 'Center Image' : 'Similar Image'}</p>
                       
+                      {/* Add description display here */}
+                      {selectedNode.description && (
+                        <div>
+                          <p className="text-gray-400 mb-1">Description:</p>
+                          <p className="bg-gray-800 p-2 rounded text-sm">{selectedNode.description}</p>
+                        </div>
+                      )}
+                      
                       {!selectedNode.isCenter && (
                         <p>
                           <span className="text-gray-400">Similarity to Center:</span>
@@ -1090,7 +1114,8 @@ return (
         resetView={resetView}
         maxNodesSliderValue={maxNodesLimit}
         setMaxNodesSliderValue={setMaxNodesLimit}
-        />
+        centerNodeDescription={graphData.nodes.find(n => n.isCenter)?.description}
+      />
     </div>
   );
 };

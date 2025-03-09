@@ -13,9 +13,18 @@ const GraphControls = ({
   clearGraph,
   resetView,
   maxNodesSliderValue,
-  setMaxNodesSliderValue
+  setMaxNodesSliderValue,
+  centerNodeDescription
 }) => {
   const [showControls, setShowControls] = useState(false);
+  
+  // Add a function to truncate descriptions
+  const truncateDescription = (desc, maxLength = 60) => {
+    if (!desc) return 'No description available';
+    return desc.length > maxLength 
+      ? `${desc.substring(0, maxLength)}...` 
+      : desc;
+  };
   
   return (
     <div className="absolute bottom-4 right-4 z-10">
@@ -33,6 +42,14 @@ const GraphControls = ({
           </div>
           
           <div className="space-y-4">
+            {/* Add description display here */}
+            {centerNodeDescription && (
+              <div className="text-xs text-gray-300 p-2 bg-gray-800/60 rounded-lg">
+                <span className="text-gray-400 block mb-1">Center Image Description:</span>
+                {truncateDescription(centerNodeDescription)}
+              </div>
+            )}
+            
             <div className="flex justify-between items-center text-sm">
               <span>Nodes Loaded:</span>
               <span className="font-mono bg-gray-800 px-2 py-1 rounded">{nodeCount}</span>
