@@ -161,6 +161,8 @@ const ImageSimilarityExplorer = () => {
         setTimeout(() => processLoadQueue(), 50);
         return;
       }
+
+      console.log(`Expanding node: ${node.path} (ID: ${nodeId})`);
       
       // Load neighbors for this node
       const filename = getImageName(node.path);
@@ -173,65 +175,103 @@ const ImageSimilarityExplorer = () => {
       }
       
       const data = await response.json();
+      console.log(`Received ${data.nodes.length} nodes and ${data.edges.length} edges`);
       
-      // Important fix: Make sure the source node is included in the response
-      // This ensures there's a connection point for the new nodes
-      if (!data.nodes.some(n => n.id === nodeId)) {
-        data.nodes.push({
-          id: nodeId,
-          path: node.path,
-          isCenter: false,
-          level: node.level || 0
-        });
-      }
-      
-      // Ensure connections to the source node
-      data.edges.forEach(edge => {
-        // Make sure at least one end of each edge connects to our source node
-        if (edge.source !== nodeId && edge.target !== nodeId) {
-          // If neither end is our source node, create a new edge to connect
-          const newEdgeId = `e-${nodeId}-${edge.source}`;
-          if (!data.edges.some(e => e.id === newEdgeId)) {
-            data.edges.push({
-              id: newEdgeId,
-              source: nodeId,
-              target: edge.source,
-              weight: 0.6 // Default weight for these connections
-            });
-          }
+      // Create a copy of the current graph data to modify
+      const newGraphData = {
+        nodes: [...graphData.nodes],
+        links: [...graphData.links]
+      };
+
+      const centerNodeInResponse = data.nodes.find(n => n.isCenter);
+
+      // map to track added nodes
+      const addedNodeIds = new Set();
+
+      // add new nodes that don't already exist
+      data.nodes.forEach(node => {
+        if (!newGraphData.nodes.some(n => n.id === node.id)) {
+          // add the node
+          addedNodeIds.add(node.id);
+          newGraphData.nodes.push({
+            id: node.id,
+            path: node.path,
+            label: node.label || getImageName(node.path),
+            isCenter: false,
+            level: node.level ? (node.level + 1) : 1
+          });
         }
       });
-      
-      // Merge with existing data
-      const newGraphData = mergeGraphData(graphData, data);
-      
-      // Update graph data
-      setGraphData(newGraphData);
-      
-      // Mark as expanded
-      setExpandedNodes(prev => {
-        const newSet = new Set(prev);
-        newSet.add(nodeId);
-        return newSet;
-      });
-      
-      // Preload images for new nodes
-      const newNodes = data.nodes.filter(n => 
-        !graphData.nodes.some(existingNode => existingNode.id === n.id)
+
+      // process edges from the response
+      data.edges.forEach(edge => {
+        //convert edge to link format
+        const link = {
+          id: edge.id,
+          source: edge.source,
+          target: edge.target,
+          value: edge.weight
+        };
+
+        // add if link does not already exist
+        if (!newGraphData.links.some(l => l.id === link.id)) {
+          newGraphData.links.push(link);
+        }
+    });
+
+      // ensure all nodes are connected to the source node
+      addedNodeIds.forEach(addedId => {
+        // skip node if already connected
+        const hasConnection = newGraphData.links.some(link =>
+        (link.source === nodeId && link.target === addedId) ||
+        (link.source === addedId && link.target === nodeId)
       );
-      
-      newNodes.forEach(node => {
-        preloadImage(node.path).catch(() => {});
-      });
-    } catch (error) {
-      console.error(`Error expanding node ${nodeId}:`, error);
-    }
+
+      if (!hasConnection) {
+        //create new connection
+        const newLinkId = `e-${nodeId}-${addedId}`;
+
+        // add if this exact link does not already exist
+        if (!newGraphData.links.some(l => l.id === newLinkId)) {
+          newGraphData.links.push({
+            id: newLinkId,
+            source: nodeId,
+            target: addedId,
+            value: 0.5 //default similarity
+          });
+        }
+      }
+    });
     
-    setLoadingMore(false);
+    // update graph data
+    setGraphData(newGraphData);
+      
+    // Mark as expanded
+    setExpandedNodes(prev => {
+      const newSet = new Set(prev);
+      newSet.add(nodeId);
+      return newSet;
+    });
+      
+    // Preload images for new nodes
+    Array.from(addedNodeIds).forEach(id => {
+      const node = newGraphData.nodes.find(n => n.id === id);
+      if (node) {
+        preloadImage(node.path).catch(() => {});
+      }
+    });
+
+    console.log(`Added ${addedNodeIds.size} new nodes`);
+
+  } catch (error) {
+      console.error(`Error expanding node ${nodeId}:`, error);
+  }
+    
+  setLoadingMore(false);
     
     // Process next batch with a short delay
     setTimeout(() => processLoadQueue(), 300);
-  }, [graphData, expandedNodes, getImageName, maxNodesLimit, neighborLimit, preloadImage, similarityThreshold, mergeGraphData]);
+  }, [graphData, expandedNodes, getImageName, maxNodesLimit, neighborLimit, preloadImage, similarityThreshold]);
 
   // Viewport change handler
   const handleViewportChange = useCallback(() => {
