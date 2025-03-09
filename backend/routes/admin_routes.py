@@ -164,7 +164,7 @@ def fix_db():
 
 @admin_bp.route('/debug/images')
 def list_images():
-    """List all available images in the configured directory"""
+    """List basic info about available images in the configured directory"""
     try:
         if not os.path.exists(IMAGES_DIR):
             return jsonify({
@@ -172,27 +172,54 @@ def list_images():
                 "cwd": os.getcwd()
             }), 404
         
-        # List all image files
-        image_files = []
-        for ext in IMAGE_EXTENSIONS:
-            # On Windows, we only need to do this once since the filesystem is case-insensitive
-            if os.name == 'nt':  # Windows
-                image_files.extend(glob.glob(os.path.join(IMAGES_DIR, ext)))
-            else:  # Linux, macOS, etc.
-                image_files.extend(glob.glob(os.path.join(IMAGES_DIR, ext)))
-                image_files.extend(glob.glob(os.path.join(IMAGES_DIR, ext.upper())))
+        # Count images by extension without loading all paths
+        count_by_ext = {}
+        total_count = 0
         
-        # Format the results and remove duplicates
-        images = list(set(os.path.basename(f) for f in image_files))
+        for ext in IMAGE_EXTENSIONS:
+            ext_name = ext.replace('*.', '')
+            if os.name == 'nt':  # Windows
+                pattern = os.path.join(IMAGES_DIR, ext)
+                count = len(glob.glob(pattern))
+            else:  # Linux, macOS, etc.
+                pattern = os.path.join(IMAGES_DIR, ext)
+                count_lower = len(glob.glob(pattern))
+                pattern_upper = os.path.join(IMAGES_DIR, ext.upper())
+                count_upper = len(glob.glob(pattern_upper))
+                count = count_lower + count_upper
+            
+            count_by_ext[ext_name] = count
+            total_count += count
+        
+        # Get a small sample of image files for display
+        sample_images = []
+        sample_limit = 5  # Reduced from all images to just 5 for speed
+        
+        for ext in IMAGE_EXTENSIONS:
+            if os.name == 'nt':  # Windows
+                pattern = os.path.join(IMAGES_DIR, ext)
+                files = glob.glob(pattern)[:sample_limit]
+                sample_images.extend([os.path.basename(f) for f in files])
+            else:  # Linux, macOS, etc.
+                pattern = os.path.join(IMAGES_DIR, ext)
+                files = glob.glob(pattern)[:sample_limit]
+                sample_images.extend([os.path.basename(f) for f in files])
+                
+                pattern_upper = os.path.join(IMAGES_DIR, ext.upper())
+                files = glob.glob(pattern_upper)[:sample_limit]
+                sample_images.extend([os.path.basename(f) for f in files])
+            
+            if len(sample_images) >= sample_limit:
+                break
         
         return jsonify({
             "images_dir": IMAGES_DIR,
-            "image_count": len(images),
-            "images": sorted(images)  # Sort for consistent output
+            "image_count": total_count,
+            "count_by_extension": count_by_ext,
+            "sample_images": sorted(sample_images)[:sample_limit]  # Sort for consistent output
         })
     except Exception as e:
         logger.error(f"Error listing images: {e}")
-        logger.error(traceback.format_exc())
         return jsonify({
             "error": str(e)
         }), 500
@@ -201,7 +228,7 @@ def list_images():
 def debug_sync():
     """Compare database images with filesystem images"""
     try:
-        # Create a timeout mechanism
+        # Set default result for timeout
         result = {"sync_status": "ERROR", "error": "Timeout"}
         
         def check_sync():
@@ -210,7 +237,7 @@ def debug_sync():
                 # Get database connection
                 db = get_db_connection()
                 
-                # Check if database is connected
+                # Fast-check if database is connected
                 try:
                     db.driver.verify_connectivity()
                 except Exception as e:
@@ -230,82 +257,79 @@ def debug_sync():
                     }
                     return
                 
-                # Get images from database (with timeout safety)
+                # Check image count in database, but don't get all paths
                 try:
-                    db_images = db.get_all_images()
-                    logger.info(f"Retrieved {len(db_images)} images from database")
+                    db_image_count = db.count_images()
+                    logger.info(f"Retrieved database image count: {db_image_count}")
                 except Exception as e:
-                    logger.error(f"Error getting images from database: {e}")
+                    logger.error(f"Error getting database image count: {e}")
                     result = {
-                        "error": f"Error getting images from database: {e}",
+                        "error": f"Error getting database image count: {e}",
+                        "sync_status": "ERROR"
+                    }
+                    return
+                    
+                # Get images from filesystem - just count them without loading paths
+                try:
+                    fs_image_count = 0
+                    for ext in IMAGE_EXTENSIONS:
+                        if os.name == 'nt':  # Windows
+                            pattern = os.path.join(IMAGES_DIR, ext)
+                            fs_image_count += len(glob.glob(pattern))
+                        else:  # Linux, macOS, etc.
+                            pattern = os.path.join(IMAGES_DIR, ext)
+                            fs_image_count += len(glob.glob(pattern))
+                            pattern_upper = os.path.join(IMAGES_DIR, ext.upper())
+                            fs_image_count += len(glob.glob(pattern_upper))
+                    
+                    logger.info(f"Found {fs_image_count} images in filesystem")
+                    
+                    # Simple sync status based on counts alone - faster response
+                    sync_needed = db_image_count != fs_image_count
+                    logger.info(f"Sync result: db_count={db_image_count}, fs_count={fs_image_count}")
+                    
+                    result = {
+                        "db_image_count": db_image_count,
+                        "fs_image_count": fs_image_count,
+                        "sync_needed": sync_needed,
+                        "sync_status": "OK"
+                    }
+                    
+                except Exception as e:
+                    logger.error(f"Error counting filesystem images: {e}")
+                    result = {
+                        "error": f"Error counting filesystem images: {e}",
                         "sync_status": "ERROR"
                     }
                     return
                 
-                # Get images from filesystem
-                fs_images = []
-                for ext in IMAGE_EXTENSIONS:
-                    if os.name == 'nt':  # Windows
-                        fs_images.extend([os.path.basename(f) for f in glob.glob(os.path.join(IMAGES_DIR, ext))])
-                    else:  # Linux, macOS, etc.
-                        fs_images.extend([os.path.basename(f) for f in glob.glob(os.path.join(IMAGES_DIR, ext))])
-                        fs_images.extend([os.path.basename(f) for f in glob.glob(os.path.join(IMAGES_DIR, ext.upper()))])
-                
-                # Remove duplicates
-                fs_images = list(set(fs_images))
-                logger.info(f"Found {len(fs_images)} images in filesystem")
-                
-                # Normalize all paths to just filenames
-                normalized_db_images = [normalize_image_path(img) for img in db_images]
-                
-                # Find differences
-                missing_in_fs = [img for img in normalized_db_images if img not in fs_images]
-                missing_in_db = [img for img in fs_images if img not in normalized_db_images]
-                
-                # Log results
-                logger.info(f"Sync result: {len(missing_in_fs)} missing in filesystem, {len(missing_in_db)} missing in database")
-                
-                result = {
-                    "db_image_count": len(db_images),
-                    "fs_image_count": len(fs_images),
-                    "missing_in_filesystem": missing_in_fs[:10],  # Limit to 10 for brevity
-                    "missing_in_database": missing_in_db[:10],    # Limit to 10 for brevity
-                    "missing_in_filesystem_count": len(missing_in_fs),
-                    "missing_in_database_count": len(missing_in_db),
-                    "sync_needed": len(missing_in_fs) > 0 or len(missing_in_db) > 0,
-                    "sync_status": "OK"
-                }
             except Exception as e:
                 logger.error(f"Error checking sync: {e}")
-                logger.error(traceback.format_exc())
                 result = {
                     "error": str(e),
-                    "sync_status": "ERROR",
-                    "trace": traceback.format_exc()
+                    "sync_status": "ERROR"
                 }
         
-        # Run with timeout
+        # Run with a short timeout for UI responsiveness
         thread = threading.Thread(target=check_sync)
         thread.daemon = True
         thread.start()
-        thread.join(timeout=5)  # 5-second timeout
+        thread.join(timeout=2)  # 2-second timeout
         
         if thread.is_alive():
             logger.error("Sync operation timed out")
             return jsonify({
                 "sync_status": "ERROR",
-                "error": "Sync operation timed out after 5 seconds"
+                "error": "Sync operation timed out after 2 seconds"
             })
         
         return jsonify(result)
         
     except Exception as e:
         logger.error(f"Error in debug_sync: {e}")
-        logger.error(traceback.format_exc())
         return jsonify({
             "error": str(e),
-            "sync_status": "ERROR",
-            "trace": traceback.format_exc()
+            "sync_status": "ERROR"
         }), 500
 
 @admin_bp.route('/debug/ping')
@@ -317,74 +341,72 @@ def debug_ping():
 def debug_db():
     """Check Neo4j database connection and contents"""
     try:
-        # Get database connection
-        db = get_db_connection()
+        # Create a timeout mechanism
+        result = {"connection": "ERROR", "error": "Timeout"}
         
-        # Check connection with timeout
-        try:
-            logger.info("Checking database connection...")
-            db.driver.verify_connectivity()
-            logger.info("Database connection successful")
-            connection_status = "OK"
-        except Exception as e:
-            logger.error(f"Database connection error: {e}")
+        def check_db():
+            nonlocal result
+            try:
+                # Get database connection
+                db = get_db_connection()
+                
+                # Only check connectivity first - this is the most important
+                try:
+                    logger.info("Checking database connection...")
+                    db.driver.verify_connectivity()
+                    logger.info("Database connection successful")
+                    
+                    # Successfully connected - set a minimal result
+                    result = {
+                        "connection": "OK",
+                        "neo4j_uri": os.getenv("NEO4J_URI", "Not set"),
+                        "timestamp": time.time()
+                    }
+                    
+                    # Try to get image count, but don't block on it
+                    try:
+                        image_count = db.count_images()
+                        logger.info(f"Database contains {image_count} images")
+                        result["image_count"] = image_count
+                    except Exception as e:
+                        logger.error(f"Error counting images: {e}")
+                        # Don't fail the entire check if this fails
+                        result["image_count"] = "ERROR"
+                    
+                except Exception as e:
+                    logger.error(f"Database connection error: {e}")
+                    result = {
+                        "connection": "ERROR",
+                        "error": str(e),
+                        "neo4j_uri": os.getenv("NEO4J_URI", "Not set")
+                    }
+            except Exception as e:
+                logger.error(f"Unexpected error in debug_db: {e}")
+                result = {
+                    "connection": "ERROR",
+                    "error": str(e)
+                }
+        
+        # Run with a slightly longer timeout
+        thread = threading.Thread(target=check_db)
+        thread.daemon = True
+        thread.start()
+        thread.join(timeout=10)  # 10-second timeout
+        
+        if thread.is_alive():
+            logger.error("Database check timed out")
             return jsonify({
                 "connection": "ERROR",
-                "error": str(e),
+                "error": "Database check timed out after 10 seconds. The database might be slow to respond.",
                 "neo4j_uri": os.getenv("NEO4J_URI", "Not set"),
-                "trace": traceback.format_exc()
-            }), 500
+                "status_message": "Database is slow or unresponsive - check Neo4j server status"
+            })
         
-        # Get image count
-        try:
-            image_count = db.count_images()
-            logger.info(f"Database contains {image_count} images")
-        except Exception as e:
-            logger.error(f"Error counting images: {e}")
-            image_count = "ERROR"
+        return jsonify(result)
         
-        # Get some sample images
-        try:
-            sample_images = db.get_sample_images(10)
-            logger.info(f"Retrieved {len(sample_images)} sample images")
-        except Exception as e:
-            logger.error(f"Error getting sample images: {e}")
-            sample_images = []
-        
-        # Try to get specific image
-        test_image = request.args.get('image', 'allianz_stadium_sydney01.jpg')
-        try:
-            image_node = db.find_image_by_path(test_image)
-            image_node_status = image_node is not None
-        except Exception as e:
-            logger.error(f"Error finding image by path: {e}")
-            image_node_status = False
-        
-        # Also try with images/ prefix
-        try:
-            image_node_with_prefix = db.find_image_by_path(f"images/{test_image}")
-            image_node_with_prefix_status = image_node_with_prefix is not None
-        except Exception as e:
-            logger.error(f"Error finding image with prefix: {e}")
-            image_node_with_prefix_status = False
-        
-        return jsonify({
-            "connection": connection_status,
-            "image_count": image_count,
-            "sample_images": sample_images,
-            "test_image": test_image,
-            "image_found": image_node_status,
-            "image_with_prefix_found": image_node_with_prefix_status,
-            "neo4j_uri": os.getenv("NEO4J_URI", "Not set"),
-            "timestamp": logging.LogRecord('', 0, '', 0, None, None, None).created
-        })
     except Exception as e:
-        logger.error(f"Error checking database: {e}")
-        logger.error(traceback.format_exc())
+        logger.error(f"Error in debug_db: {e}")
         return jsonify({
             "connection": "ERROR",
-            "error": str(e),
-            "trace": traceback.format_exc(),
-            "neo4j_uri": os.getenv("NEO4J_URI", "Not set")
-        }), 500
-    
+            "error": str(e)
+        })

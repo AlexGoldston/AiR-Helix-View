@@ -305,7 +305,6 @@
     </div>
     
     <script>
-        // Add this to the top of your script
         function addBaseUrl(path) {
             // Get current origin (protocol + hostname + port)
             const origin = window.location.origin;
@@ -334,104 +333,8 @@
                 console.error(`Fetch error for ${url}:`, error);
                 throw error;
             }
-        }
+        }        
 
-        // Generic fetch with loading state and error handling
-        async function fetchDataWithLoading(url, method = 'GET', resultElement = null, loadingMessage = 'Loading...', timeoutMs = 10000) {
-            try {
-                // Add base URL if needed
-                const fullUrl = url.startsWith('http') ? url : window.location.origin + (url.startsWith('/') ? url : '/' + url);
-                console.log(`Starting fetch request to: ${fullUrl}`);
-                
-                if (resultElement) {
-                    resultElement.innerHTML = `<div class="spinner"></div> ${loadingMessage}`;
-                    resultElement.parentElement.classList.add('refreshing');
-                }
-                
-                // Create AbortController for timeout
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-                
-                try {
-                    const response = await fetch(fullUrl, {
-                        method,
-                        headers: {
-                            'Accept': 'application/json',
-                            'Content-Type': 'application/json',
-                            'Cache-Control': 'no-cache, no-store'
-                        },
-                        signal: controller.signal
-                    });
-                    
-                    clearTimeout(timeoutId);
-                    console.log(`Response received from ${url}:`, response);
-                    
-                    if (!response.ok) {
-                        throw new Error(`HTTP error! Status: ${response.status}`);
-                    }
-                    
-                    const data = await response.json();
-                    console.log(`Parsed JSON data from ${url}:`, data);
-                    
-                    if (resultElement) {
-                        resultElement.parentElement.classList.remove('refreshing');
-                    }
-                    
-                    return { success: true, data };
-                } catch (error) {
-                    clearTimeout(timeoutId);
-                    throw error;
-                }
-            } catch (error) {
-                console.error(`Error fetching from ${url}:`, error);
-                
-                let errorMessage = error.message;
-                if (error.name === 'AbortError') {
-                    errorMessage = `Request timed out after ${timeoutMs/1000} seconds`;
-                }
-                
-                if (resultElement) {
-                    resultElement.innerHTML = `<div class="error" style="color: red; padding: 10px; background: #fff1f0; border-radius: 4px; margin-top: 10px;">
-                        <strong>Error:</strong> ${errorMessage}
-                        <button onclick="retryFetch('${url}', '${method}', this.parentElement.parentElement.id, '${loadingMessage}')" 
-                                style="display: block; margin-top: 10px; padding: 5px 10px; background: #4285F4; color: white; border: none; border-radius: 4px; cursor: pointer;">
-                            Retry
-                        </button>
-                    </div>`;
-                    resultElement.parentElement.classList.remove('refreshing');
-                }
-                
-                return { success: false, error };
-            }
-        }
-
-        // Add retry function
-        function retryFetch(url, method, elementId, loadingMessage) {
-            const element = document.getElementById(elementId);
-            if (element) {
-                fetchDataWithLoading(url, method, element, loadingMessage);
-            }
-        }
-        // Tab switching functionality
-        document.querySelectorAll('.tab').forEach(tab => {
-            tab.addEventListener('click', () => {
-                // Hide all tabs
-                document.querySelectorAll('.tab-content').forEach(content => {
-                    content.classList.remove('active');
-                });
-                
-                // Deactivate all tab buttons
-                document.querySelectorAll('.tab').forEach(t => {
-                    t.classList.remove('active');
-                });
-                
-                // Activate selected tab and content
-                tab.classList.add('active');
-                const tabName = tab.getAttribute('data-tab');
-                document.getElementById(tabName).classList.add('active');
-            });
-        });
-        
         // Generic fetch with loading state and error handling
         async function fetchDataWithLoading(url, method = 'GET', resultElement = null, loadingMessage = 'Loading...') {
             try {
@@ -458,22 +361,23 @@
                 return { success: false, error };
             }
         }
-        
-        // Create a status badge element
-        function createStatusBadge(status) {
-            const statusClass = status.toLowerCase();
-            return `<span class="status-badge ${statusClass}">${status}</span>`;
+
+        // Retry function for fetch operations
+        function retryFetch(url, method, elementId, loadingMessage) {
+            const element = document.getElementById(elementId);
+            if (element) {
+                fetchDataWithLoading(url, method, element, loadingMessage);
+            }
         }
-        
-        // Update system status summary on dashboard
-        // Update system status summary on dashboard
+
+        // Update system status summary with proper timeout handling
         async function updateSystemStatus() {
             const statusContainer = document.getElementById('systemStatusContent');
             
             try {
                 statusContainer.innerHTML = '<div class="spinner"></div> Checking system status...';
                 
-                // First try ping to ensure basic connectivity
+                // First try ping to ensure basic connectivity with a short timeout
                 try {
                     await fetchWithTimeout(addBaseUrl('/debug/ping'), 3000);
                     console.log('Ping successful, proceeding with status checks');
@@ -488,24 +392,90 @@
                     return;
                 }
                 
-                // Now do the main status checks
-                console.log('Fetching database status...');
-                const dbResult = await fetchDataWithLoading('/debug/db');
+                // Now do the main status checks with timeouts
+                let dbStatus = 'UNKNOWN';
+                let imagesStatus = 'UNKNOWN';
+                let syncStatus = 'UNKNOWN';
                 
-                console.log('Fetching images status...');
-                const imagesResult = await fetchDataWithLoading('/debug/images');
-                
-                console.log('Fetching sync status...');
-                const syncResult = await fetchDataWithLoading('/debug/sync');
+                // Run checks in parallel with Promise.allSettled
+                const results = await Promise.allSettled([
+                    fetchWithTimeout(addBaseUrl('/debug/db'), 5000).then(res => res.json()),
+                    fetchWithTimeout(addBaseUrl('/debug/images'), 5000).then(res => res.json()),
+                    fetchWithTimeout(addBaseUrl('/debug/sync'), 5000).then(res => res.json())
+                ]);
                 
                 // Process results
-                const dbStatus = dbResult.success && dbResult.data.connection === 'OK' ? 'OK' : 'ERROR';
-                const imagesStatus = imagesResult.success ? 'OK' : 'ERROR';
-                const syncNeeded = syncResult.success && syncResult.data.sync_needed === true;
-                const syncStatus = !syncResult.success ? 'ERROR' : (syncNeeded ? 'WARNING' : 'OK');
+                const [dbResult, imagesResult, syncResult] = results;
                 
-                // Update the system status panel
-                // Rest of your existing code
+                // Check DB status
+                if (dbResult.status === 'fulfilled') {
+                    dbStatus = dbResult.value.connection === 'OK' ? 'OK' : 'ERROR';
+                } else {
+                    console.error('DB check error:', dbResult.reason);
+                    dbStatus = 'ERROR';
+                }
+                
+                // Check images status
+                if (imagesResult.status === 'fulfilled') {
+                    imagesStatus = imagesResult.value.error ? 'ERROR' : 'OK';
+                } else {
+                    console.error('Images check error:', imagesResult.reason);
+                    imagesStatus = 'ERROR';
+                }
+                
+                // Check sync status
+                if (syncResult.status === 'fulfilled') {
+                    const syncNeeded = syncResult.value.sync_needed === true;
+                    syncStatus = syncResult.value.sync_status === 'ERROR' ? 'ERROR' : (syncNeeded ? 'WARNING' : 'OK');
+                } else {
+                    console.error('Sync check error:', syncResult.reason);
+                    syncStatus = 'ERROR';
+                }
+                
+                // Update the system status panel with a nice summary
+                const statusHtml = `
+                    <div class="summary-item">
+                        <span class="summary-label">Database:</span>
+                        <span>
+                            ${dbStatus === 'OK' 
+                                ? '<span class="status-badge ok">Connected</span>' 
+                                : '<span class="status-badge error">Error</span>'}
+                        </span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="summary-label">Images Directory:</span>
+                        <span>
+                            ${imagesStatus === 'OK' 
+                                ? '<span class="status-badge ok">Available</span>' 
+                                : '<span class="status-badge error">Error</span>'}
+                        </span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="summary-label">Database/Filesystem Sync:</span>
+                        <span>
+                            ${syncStatus === 'OK' 
+                                ? '<span class="status-badge ok">In Sync</span>' 
+                                : syncStatus === 'WARNING' 
+                                    ? '<span class="status-badge warning">Needs Sync</span>' 
+                                    : '<span class="status-badge error">Error</span>'}
+                        </span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="summary-label">Last Check:</span>
+                        <span>${new Date().toLocaleTimeString()}</span>
+                    </div>
+                    <div style="margin-top: 10px;">
+                        <button onclick="updateSystemStatus()" class="action-button">Refresh Status</button>
+                    </div>
+                `;
+                
+                statusContainer.innerHTML = statusHtml;
+                
+                // Update indicators
+                updateStatusIndicator('dbStatusIndicator', dbStatus);
+                updateStatusIndicator('imagesDirStatusIndicator', imagesStatus);
+                updateStatusIndicator('syncStatusIndicator', syncStatus);
+                
             } catch (error) {
                 console.error("Error in updateSystemStatus:", error);
                 statusContainer.innerHTML = `
@@ -515,6 +485,32 @@
                     <button onclick="updateSystemStatus()" class="action-button">Retry</button>
                 `;
             }
+        }
+
+        // Tab switching functionality
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                // Hide all tabs
+                document.querySelectorAll('.tab-content').forEach(content => {
+                    content.classList.remove('active');
+                });
+                
+                // Deactivate all tab buttons
+                document.querySelectorAll('.tab').forEach(t => {
+                    t.classList.remove('active');
+                });
+                
+                // Activate selected tab and content
+                tab.classList.add('active');
+                const tabName = tab.getAttribute('data-tab');
+                document.getElementById(tabName).classList.add('active');
+            });
+        });
+
+        // Create a status badge element
+        function createStatusBadge(status) {
+            const statusClass = status.toLowerCase();
+            return `<span class="status-badge ${statusClass}">${status}</span>`;
         }
         
         // Update status indicator
@@ -541,7 +537,7 @@
                     break;
             }
         }
-        
+
         // Format database status information
         function formatDatabaseStatus(data) {
             if (!data) return 'No database information available.';
@@ -569,7 +565,7 @@
                 </div>
             `;
         }
-        
+
         // Format images directory status
         function formatImagesDirectoryStatus(data) {
             if (!data) return 'No images directory information available.';
@@ -589,11 +585,11 @@
                 </div>
                 <div class="summary-item">
                     <span class="summary-label">First 5 Images:</span>
-                    <span>${data.images && data.images.length ? data.images.slice(0, 5).join(', ') + (data.images.length > 5 ? '...' : '') : 'None'}</span>
+                    <span>${data.sample_images && data.sample_images.length ? data.sample_images.slice(0, 5).join(', ') + (data.sample_images.length > 5 ? '...' : '') : 'None'}</span>
                 </div>
             `;
         }
-        
+
         // Format sync status information
         function formatSyncStatus(data) {
             if (!data) return 'No sync information available.';
@@ -622,15 +618,15 @@
                 </div>
                 <div class="summary-item">
                     <span class="summary-label">Missing in Database:</span>
-                    <span>${data.missing_in_database ? data.missing_in_database.length : '0'}</span>
+                    <span>${data.missing_in_database_count || 0}</span>
                 </div>
                 <div class="summary-item">
                     <span class="summary-label">Missing in Filesystem:</span>
-                    <span>${data.missing_in_filesystem ? data.missing_in_filesystem.length : '0'}</span>
+                    <span>${data.missing_in_filesystem_count || 0}</span>
                 </div>
             `;
         }
-        
+
         // Get log style based on level
         function getLogStyle(level) {
             switch(level) {
@@ -640,7 +636,7 @@
                 default: return '';
             }
         }
-        
+
         // Fetch recent logs for the teaser
         async function refreshLogs() {
             try {
@@ -663,7 +659,7 @@
                 document.getElementById('logsTeaser').innerHTML = `Error loading logs: ${error.message}`;
             }
         }
-        
+
         // Fetch full logs for the logs tab
         async function refreshFullLogs(level = null, limit = 100) {
             try {
@@ -716,7 +712,7 @@
                 updateStatusIndicator('dbStatusIndicator', 'ERROR');
             }
         }
-        
+
         // Check sync status
         async function checkSyncStatus() {
             const result = document.getElementById('syncResult');
@@ -747,7 +743,7 @@
                 updateStatusIndicator('syncStatusIndicator', 'ERROR');
             }
         }
-        
+
         // List available images
         async function listImages() {
             const result = document.getElementById('imagesResult');
@@ -777,7 +773,7 @@
                 updateStatusIndicator('imagesDirStatusIndicator', 'ERROR');
             }
         }
-        
+
         // Verify images directory
         async function verifyImagesDirectory() {
             const result = document.getElementById('imagesResult');
@@ -819,7 +815,7 @@
                 updateStatusIndicator('imagesDirStatusIndicator', 'ERROR');
             }
         }
-        
+
         // Fix database
         async function fixDatabase() {
             if (confirm('This will remove database nodes for images that don\'t exist in the filesystem. Continue?')) {
@@ -848,7 +844,7 @@
                 }
             }
         }
-        
+
         // Reset database
         async function resetDatabase() {
             if (confirm('This will RESET the entire database and rebuild it from the images directory. Continue?')) {
@@ -877,7 +873,7 @@
                 }
             }
         }
-        
+
         // Clear logs
         async function clearAllLogs() {
             if (confirm('Are you sure you want to clear all logs?')) {
@@ -895,7 +891,7 @@
                 }
             }
         }
-        
+
         // Fetch system information
         async function fetchSystemInfo() {
             const infoElement = document.getElementById('systemInfo');
@@ -938,7 +934,7 @@
                 infoElement.innerHTML = `<pre class="error">Error fetching system information: ${error.message}</pre>`;
             }
         }
-        
+
         // Test database connection
         async function testDatabaseConnection() {
             const resultElement = document.getElementById('connectionTestResult');
@@ -991,7 +987,7 @@
                 `;
             }
         }
-        
+
         // Test image directory access
         async function testImageDirAccess() {
             const resultElement = document.getElementById('connectionTestResult');
@@ -1019,11 +1015,11 @@
                         </div>
                     `;
                     
-                    if (data.images && data.images.length > 0) {
+                    if (data.sample_images && data.sample_images.length > 0) {
                         resultHtml += `
                             <div class="summary-item">
                                 <span class="summary-label">Sample Images:</span>
-                                <span>${data.images.slice(0, 5).join(', ')}${data.images.length > 5 ? '...' : ''}</span>
+                                <span>${data.sample_images.slice(0, 5).join(', ')}${data.sample_images.length > 5 ? '...' : ''}</span>
                             </div>
                         `;
                     }
@@ -1049,9 +1045,12 @@
                 `;
             }
         }
-        
+
         // Add event listeners
         document.addEventListener('DOMContentLoaded', () => {
+            // Initialize status check with longer delay
+            setTimeout(updateSystemStatus, 1000);
+            
             // Database tab
             document.getElementById('checkDb').addEventListener('click', checkDatabase);
             document.getElementById('resetDb').addEventListener('click', resetDatabase);
@@ -1095,7 +1094,6 @@
             });
             
             // Load initial data
-            updateSystemStatus();
             refreshLogs();
             fetchSystemInfo();
             
