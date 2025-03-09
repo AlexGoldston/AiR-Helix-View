@@ -17,6 +17,56 @@ import math
 # Configure logging
 logger = logging.getLogger('image-similarity')
 
+
+def sanitize_for_json(obj, visited=None):
+    """
+    Recursively process an object to make it JSON serializable.
+    Handles circular references, native Python types, etc.
+    
+    Args:
+        obj: The object to sanitize
+        visited: Set of already visited object ids (for circular reference detection)
+        
+    Returns:
+        A JSON-serializable version of the object
+    """
+    if visited is None:
+        visited = set()
+    
+    # Get object ID to detect circular references
+    obj_id = id(obj)
+    if obj_id in visited:
+        return "CIRCULAR_REFERENCE"
+    
+    # Handle basic types that are already JSON serializable
+    if obj is None or isinstance(obj, (int, float, str)):
+        return obj
+    
+    # Handle booleans
+    if isinstance(obj, bool):
+        return obj
+    
+    # Add this object to visited set
+    visited.add(obj_id)
+    
+    # Handle collections
+    if isinstance(obj, list) or isinstance(obj, tuple):
+        return [sanitize_for_json(item, visited.copy()) for item in obj]
+    
+    if isinstance(obj, dict):
+        return {str(key): sanitize_for_json(value, visited.copy()) 
+                for key, value in obj.items()}
+    
+    if isinstance(obj, set):
+        return [sanitize_for_json(item, visited.copy()) for item in obj]
+    
+    # Handle numpy arrays
+    if hasattr(obj, 'tolist'):  # For numpy arrays
+        return obj.tolist()
+    
+    # Handle other objects - convert to string
+    return str(obj)
+
 class Neo4jConnection:
     def __init__(self, connection_timeout=5, max_connection_lifetime=3600):
         load_dotenv()
@@ -540,7 +590,8 @@ class Neo4jConnection:
         # 2. Store complex features as serialized JSON
         if features:
             # Serialize the features dictionary to JSON
-            features_json = json.dumps(features, default=lambda o: str(o) if isinstance(o, (bool, set)) else o)
+            sanitized_features = sanitize_for_json(features)
+            features_json = json.dumps(sanitized_features)
             tx.run(
                 """
                 MATCH (i:Image {path: $path})
