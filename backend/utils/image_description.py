@@ -19,7 +19,7 @@ except ImportError:
 class ImageDescriptionGenerator:
     def __init__(self, model_name="Salesforce/blip-image-captioning-base"):
         """
-        intit the image description generator with a vision-language model.
+        Initialize the image description generator with a vision-language model.
 
         Args:
             model_name (str): name of model to use, default is BLIP.
@@ -29,24 +29,32 @@ class ImageDescriptionGenerator:
         
         logger.info(f"initialising ImageDescriptionGenerator with model: {model_name}")
         self.model_name = model_name
+        
+        # Add device detection
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        logger.info(f"Using device: {self.device}")
 
-        #load the model and processor
+        # Load the model and processor
         try:
-            self.processor = AutoProcessor.from_pretrained(model_name)
-            # Load model directly to the correct device
-            self.model = AutoModelForCausalLM.from_pretrained(model_name).to(self.device)
+            # Import the correct classes for BLIP
+            from transformers import BlipProcessor, BlipForConditionalGeneration
+            
+            # Use the specific BLIP classes instead of Auto classes
+            self.processor = BlipProcessor.from_pretrained(model_name)
+            self.model = BlipForConditionalGeneration.from_pretrained(model_name).to(self.device)
+            
             logger.info(f"Model loaded successfully on {self.device}")
 
-            # additional logging for GPU info if using CUDA
+            # Additional logging for GPU info if using CUDA
             if self.device == "cuda":
                 logger.info(f"GPU: {torch.cuda.get_device_name(0)}")
                 logger.info(f"CUDA version: {torch.version.cuda}")
-    
+        
         except Exception as e:
             logger.error(f"error loading model: {e}")
             raise
     
-    def generate_description(self, image_path, max_length=50):
+    def generate_description(self, image_path, max_length=200):
         """
         generate a description for the given image
 
