@@ -2,7 +2,6 @@
 import neo4j
 from neo4j import GraphDatabase
 import os
-import os.path as op
 from dotenv import load_dotenv
 from embeddings import ImageEmbedder
 import numpy as np
@@ -11,6 +10,9 @@ import logging
 from utils.db_performance import track_query_performance
 import traceback  # Added for better error logging
 from tqdm import tqdm  # For progress tracking
+from utils.feature_extraction import ImageFeatureExtractor, batch_extract_features
+import json
+import math
 
 # Configure logging
 logger = logging.getLogger('image-similarity')
@@ -56,7 +58,7 @@ class Neo4jConnection:
             logger.info("Successfully connected to Neo4j!")
             
             # Log driver details
-            logger.info(f"Neo4j driver details:")
+            logger.info("Neo4j driver details:")
             logger.info(f"  - Driver version: {neo4j.__version__}")
             logger.info(f"  - Rust extension: {'Enabled' if rust_extension_available else 'Disabled'}")
             logger.info(f"  - Connection pool size: {driver_config['max_connection_pool_size']}")
@@ -458,6 +460,403 @@ class Neo4jConnection:
     def _clear_database_tx(tx):
         tx.run("MATCH (n) DETACH DELETE n")
 
+    def create_schema_constraints(self):
+        """Create constraints and indexes for faster lookups"""
+        with self.driver.session() as session:
+            # Create constraints for unique nodes
+            try:
+                session.run("CREATE CONSTRAINT FOR (t:Tag) REQUIRE t.name IS UNIQUE")
+                session.run("CREATE CONSTRAINT FOR (c:Category) REQUIRE c.name IS UNIQUE")
+                
+                # Create indexes for faster lookups
+                session.run("CREATE INDEX FOR (i:Image) ON (i.path)")
+                session.run("CREATE INDEX FOR (f:Feature) ON (f.name, f.value)")
+                
+                logger.info("Created constraints and indexes for tags and features")
+            except Exception as e:
+                # Handle case where constraints already exist
+                logger.info(f"Schema setup note: {e}")
+
+    def store_image_features(self, image_path, features):
+        """
+        Store extracted image features in the graph database
+        
+        Args:
+            image_path (str): Path of the image
+            features (dict): Dictionary of extracted features
+        
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        if not features:
+            logger.warning(f"No features to store for {image_path}")
+            return False
+            
+        with self.driver.session() as session:
+            try:
+                # Store features as a transaction
+                return session.execute_write(self._store_image_features_tx, image_path, features)
+            except Exception as e:
+                logger.error(f"Error storing features for {image_path}: {e}")
+                return False
+
+    @staticmethod
+    def _store_image_features_tx(tx, image_path, features):
+        """Transaction function to store image features"""
+        
+        # First check if the image node exists
+        result = tx.run(
+            "MATCH (i:Image {path: $path}) RETURN i",
+            path=image_path
+        )
+        
+        if not result.single():
+            # Image node not found
+            return False
+        
+        # 1. Store feature properties on the Image node itself
+        # For properties that are simple values, store directly on the image node
+        feature_props = {}
+        
+        # Add basic properties
+        if 'basic' in features:
+            for key, value in features['basic'].items():
+                feature_props[f"basic_{key}"] = value
+        
+        # Add average color as property
+        if 'color' in features and 'color_hex' in features['color']:
+            feature_props["color_hex"] = features['color']['color_hex']
+        
+        if 'color' in features and 'brightness_category' in features['color']:
+            feature_props["brightness"] = features['color']['brightness_category']
+        
+        # Store properties if we have any
+        if feature_props:
+            props_str = ", ".join(f"i.{key} = ${key}" for key in feature_props.keys())
+            query = f"MATCH (i:Image {{path: $path}}) SET {props_str} RETURN i"
+            props = {**feature_props, "path": image_path}
+            tx.run(query, **props)
+        
+        # 2. Store complex features as serialized JSON
+        if features:
+            # Serialize the features dictionary to JSON
+            features_json = json.dumps(features)
+            tx.run(
+                """
+                MATCH (i:Image {path: $path})
+                SET i.features_json = $features_json
+                """,
+                path=image_path,
+                features_json=features_json
+            )
+        
+        # 3. Create Tag nodes and connect them to the image
+        if 'tags' in features and features['tags']:
+            for tag in features['tags']:
+                # Handle hierarchical tags (e.g., "contains:person")
+                if ':' in tag:
+                    category, value = tag.split(':', 1)
+                    
+                    # Create or match the category node
+                    tx.run(
+                        """
+                        MERGE (c:Category {name: $category})
+                        MERGE (t:Tag {name: $tag})
+                        MERGE (t)-[:IN_CATEGORY]->(c)
+                        MERGE (i:Image {path: $path})
+                        MERGE (i)-[:HAS_TAG]->(t)
+                        """,
+                        category=category,
+                        tag=tag,
+                        path=image_path
+                    )
+                else:
+                    # Simple tag without category
+                    tx.run(
+                        """
+                        MERGE (t:Tag {name: $tag})
+                        MERGE (i:Image {path: $path})
+                        MERGE (i)-[:HAS_TAG]->(t)
+                        """,
+                        tag=tag,
+                        path=image_path
+                    )
+        
+        # 4. Store specific feature types as separate nodes
+        
+        # Colors
+        if 'color' in features and 'dominant_colors' in features['color']:
+            for color in features['color']['dominant_colors']:
+                tx.run(
+                    """
+                    MERGE (c:Color {name: $color})
+                    MERGE (i:Image {path: $path})
+                    MERGE (i)-[:HAS_COLOR]->(c)
+                    """,
+                    color=color,
+                    path=image_path
+                )
+        
+        # Detected objects
+        if 'objects' in features:
+            for obj in features['objects']:
+                if 'label' in obj and 'confidence' in obj:
+                    tx.run(
+                        """
+                        MERGE (o:Object {name: $label})
+                        MERGE (i:Image {path: $path})
+                        MERGE (i)-[r:CONTAINS]->(o)
+                        SET r.confidence = $confidence
+                        """,
+                        label=obj['label'],
+                        path=image_path,
+                        confidence=obj['confidence']
+                    )
+        
+        # EXIF data for camera equipment
+        if 'exif' in features:
+            exif = features['exif']
+            
+            # Camera model
+            if 'camera_model' in exif:
+                tx.run(
+                    """
+                    MERGE (c:Camera {model: $model})
+                    MERGE (i:Image {path: $path})
+                    MERGE (i)-[:TAKEN_WITH]->(c)
+                    """,
+                    model=exif['camera_model'],
+                    path=image_path
+                )
+            
+            # Lens
+            if 'lens' in exif:
+                tx.run(
+                    """
+                    MERGE (l:Lens {name: $lens})
+                    MERGE (i:Image {path: $path})
+                    MERGE (i)-[:USED_LENS]->(l)
+                    """,
+                    lens=exif['lens'],
+                    path=image_path
+                )
+        
+        return True
+
+    def get_images_by_tags(self, tags, operator='AND', limit=50):
+        """
+        Find images that have specific tags
+        
+        Args:
+            tags (list): List of tags to search for
+            operator (str): 'AND' or 'OR' - whether all tags must match or any
+            limit (int): Maximum number of results to return
+            
+        Returns:
+            list: List of image paths that match the criteria
+        """
+        if not tags:
+            return []
+        
+        with self.driver.session() as session:
+            try:
+                if operator.upper() == 'AND':
+                    # All tags must match
+                    query = """
+                    MATCH (i:Image)
+                    WHERE all(tag IN $tags WHERE EXISTS((i)-[:HAS_TAG]->(:Tag {name: tag})))
+                    RETURN i.path AS path
+                    LIMIT $limit
+                    """
+                else:  # OR
+                    # Any tag must match
+                    query = """
+                    MATCH (i:Image)-[:HAS_TAG]->(t:Tag)
+                    WHERE t.name IN $tags
+                    RETURN DISTINCT i.path AS path
+                    LIMIT $limit
+                    """
+                
+                result = session.run(query, tags=tags, limit=limit)
+                return [record["path"] for record in result]
+            except Exception as e:
+                logger.error(f"Error finding images by tags: {e}")
+                return []
+
+    def get_images_by_color(self, color, limit=50):
+        """
+        Find images with a specific dominant color
+        
+        Args:
+            color (str): Color name to search for
+            limit (int): Maximum number of results to return
+            
+        Returns:
+            list: List of image paths that match the criteria
+        """
+        with self.driver.session() as session:
+            try:
+                query = """
+                MATCH (i:Image)-[:HAS_COLOR]->(c:Color {name: $color})
+                RETURN i.path AS path
+                LIMIT $limit
+                """
+                
+                result = session.run(query, color=color, limit=limit)
+                return [record["path"] for record in result]
+            except Exception as e:
+                logger.error(f"Error finding images by color: {e}")
+                return []
+
+    def get_images_containing_object(self, object_name, min_confidence=0.5, limit=50):
+        """
+        Find images containing a specific object
+        
+        Args:
+            object_name (str): Name of the object to search for
+            min_confidence (float): Minimum confidence score
+            limit (int): Maximum number of results to return
+            
+        Returns:
+            list: List of image paths that match the criteria
+        """
+        with self.driver.session() as session:
+            try:
+                query = """
+                MATCH (i:Image)-[r:CONTAINS]->(o:Object {name: $object_name})
+                WHERE r.confidence >= $min_confidence
+                RETURN i.path AS path, r.confidence AS confidence
+                ORDER BY r.confidence DESC
+                LIMIT $limit
+                """
+                
+                result = session.run(
+                    query, 
+                    object_name=object_name, 
+                    min_confidence=min_confidence,
+                    limit=limit
+                )
+                
+                return [{"path": record["path"], "confidence": record["confidence"]} for record in result]
+            except Exception as e:
+                logger.error(f"Error finding images containing object: {e}")
+                return []
+
+    def search_images_by_features(self, criteria, limit=50):
+        """
+        Search for images based on multiple feature criteria
+        
+        Args:
+            criteria (dict): Dictionary of search criteria
+                Example:
+                {
+                    "tags": ["landscape", "sunset"],
+                    "tags_operator": "AND",
+                    "colors": ["blue", "orange"],
+                    "colors_operator": "OR",
+                    "objects": ["person", "dog"],
+                    "objects_operator": "OR",
+                    "min_confidence": 0.6,
+                    "orientation": "landscape",
+                    "camera": "Canon EOS R5"
+                }
+            limit (int): Maximum number of results to return
+            
+        Returns:
+            list: List of image paths that match the criteria
+        """
+        if not criteria:
+            return []
+        
+        with self.driver.session() as session:
+            try:
+                # Build a Cypher query based on the criteria
+                match_clauses = ["MATCH (i:Image)"]
+                where_clauses = []
+                params = {}
+                
+                # Handle tags
+                if "tags" in criteria and criteria["tags"]:
+                    tags = criteria["tags"]
+                    params["tags"] = tags
+                    
+                    if criteria.get("tags_operator", "AND").upper() == "AND":
+                        # All tags must match
+                        where_clauses.append(
+                            "all(tag IN $tags WHERE EXISTS((i)-[:HAS_TAG]->(:Tag {name: tag})))"
+                        )
+                    else:
+                        # Any tag must match
+                        match_clauses.append("MATCH (i)-[:HAS_TAG]->(tag:Tag)")
+                        where_clauses.append("tag.name IN $tags")
+                
+                # Handle colors
+                if "colors" in criteria and criteria["colors"]:
+                    colors = criteria["colors"]
+                    params["colors"] = colors
+                    
+                    if criteria.get("colors_operator", "OR").upper() == "AND":
+                        # All colors must be present
+                        where_clauses.append(
+                            "all(color IN $colors WHERE EXISTS((i)-[:HAS_COLOR]->(:Color {name: color})))"
+                        )
+                    else:
+                        # Any color must be present
+                        match_clauses.append("MATCH (i)-[:HAS_COLOR]->(color:Color)")
+                        where_clauses.append("color.name IN $colors")
+                
+                # Handle objects
+                if "objects" in criteria and criteria["objects"]:
+                    objects = criteria["objects"]
+                    min_confidence = criteria.get("min_confidence", 0.5)
+                    params["objects"] = objects
+                    params["min_confidence"] = min_confidence
+                    
+                    if criteria.get("objects_operator", "OR").upper() == "AND":
+                        # All objects must be present
+                        where_clauses.append(
+                            """all(obj IN $objects WHERE EXISTS((i)-[r:CONTAINS]->(:Object {name: obj}))
+                            AND any(r in [(i)-[rel:CONTAINS]->(:Object {name: obj}) | rel] 
+                            WHERE r.confidence >= $min_confidence))"""
+                        )
+                    else:
+                        # Any object must be present
+                        match_clauses.append("MATCH (i)-[r:CONTAINS]->(obj:Object)")
+                        where_clauses.append(
+                            "obj.name IN $objects AND r.confidence >= $min_confidence"
+                        )
+                
+                # Handle orientation
+                if "orientation" in criteria and criteria["orientation"]:
+                    orientation = criteria["orientation"]
+                    params["orientation"] = orientation
+                    where_clauses.append("i.basic_orientation = $orientation")
+                
+                # Handle camera
+                if "camera" in criteria and criteria["camera"]:
+                    camera = criteria["camera"]
+                    params["camera"] = camera
+                    match_clauses.append("MATCH (i)-[:TAKEN_WITH]->(camera:Camera)")
+                    where_clauses.append("camera.model = $camera")
+                
+                # Build the final query
+                query = "\n".join(match_clauses)
+                
+                if where_clauses:
+                    query += "\nWHERE " + " AND ".join(where_clauses)
+                
+                query += "\nRETURN DISTINCT i.path AS path LIMIT $limit"
+                params["limit"] = limit
+                
+                # Execute the query
+                result = session.run(query, **params)
+                return [record["path"] for record in result]
+                
+            except Exception as e:
+                logger.error(f"Error searching images by features: {e}")
+                logger.error(f"Query error details: {traceback.format_exc()}")
+                return []
+
 def calculate_cosine_similarity(embedding1, embedding2):
     return np.dot(embedding1, embedding2) / (np.linalg.norm(embedding1) * np.linalg.norm(embedding2))
 
@@ -468,6 +867,62 @@ def normalize_image_path(path):
     
     # Get just the filename without any path
     return os.path.basename(path)
+
+
+
+def extract_and_store_features(image_dir, db_connection, use_ml_features=True):
+        logger.info("Setting up database schema for features and tags")
+        db_connection.create_schema_constraints()
+        # Find all image files
+        image_paths = []
+        for ext in ['*.jpg', '*.jpeg', '*.png', '*.gif']:
+            image_paths.extend(glob.glob(os.path.join(image_dir, ext)))
+            image_paths.extend(glob.glob(os.path.join(image_dir, ext.upper())))
+        
+        logger.info(f"Extracting features for {len(image_paths)} images")
+        
+        # Use batch processing for efficiency
+        batch_size = 10  # Adjust based on your system's capabilities
+        
+        # Track progress
+        processed_count = 0
+        successful_count = 0
+        
+        # Process in batches
+        for i in range(0, len(image_paths), batch_size):
+            batch = image_paths[i:i+batch_size]
+            logger.info(f"Processing batch {i//batch_size + 1}/{math.ceil(len(image_paths)/batch_size)} ({len(batch)} images)")
+            
+            # Extract features for the batch
+            extractor = ImageFeatureExtractor(use_ml_features=use_ml_features)
+            
+            for image_path in tqdm(batch, desc="Extracting features"):
+                try:
+                    # Get normalized filename
+                    filename = normalize_image_path(image_path)
+                    
+                    # Extract features
+                    features = extractor.extract_features(image_path)
+                    
+                    if features:
+                        # Store features in database
+                        success = db_connection.store_image_features(filename, features)
+                        
+                        if success:
+                            successful_count += 1
+                        
+                    processed_count += 1
+                    
+                    # Log progress periodically
+                    if processed_count % 10 == 0:
+                        logger.info(f"Processed {processed_count}/{len(image_paths)} images, {successful_count} successful")
+                    
+                except Exception as e:
+                    logger.error(f"Error processing {image_path}: {e}")
+                    logger.error(traceback.format_exc())
+        
+        logger.info(f"Feature extraction complete. Processed {processed_count} images, {successful_count} successful.")
+        return successful_count
 
 def populate_graph(image_dir, similarity_threshold=0.7, generate_descriptions=True, use_ml_descriptions=True, force_gpu=False):
     """
@@ -679,7 +1134,16 @@ def populate_graph(image_dir, similarity_threshold=0.7, generate_descriptions=Tr
             db.create_image_node(filename, embedding, description)
         except Exception as e:
             logger.error(f"Failed to create node for {filename}: {e}")
-    
+
+    if generate_descriptions:
+        logger.info("Extracting and storing image features...")
+        try:
+            extract_and_store_features(image_dir, db, use_ml_features=True)
+        except Exception as e:
+            logger.error(f"Error during feature extraction: {e}")
+            logger.error(traceback.format_exc())
+            # Continue even if feature extraction fails
+        
     # Fourth pass: create similarity relationships
     relationship_count = 0
     filenames = list(embeddings.keys())
@@ -700,20 +1164,20 @@ def populate_graph(image_dir, similarity_threshold=0.7, generate_descriptions=Tr
                     relationship_count += 1
             except Exception as e:
                 logger.error(f"Error creating similarity between {filename1} and {filename2}: {e}")
-    
-    # Final logging
-    logger.info(f"Graph population complete")
-    logger.info(f"Total nodes: {len(embeddings)}")
-    logger.info(f"Total relationships: {relationship_count}")
-    
-    # Verify database state
-    node_count = db.count_images()
-    logger.info(f"Nodes in database: {node_count}")
-    
-    # Close database connection
-    db.close()
-    
-    return True
+        
+        # Final logging
+        logger.info("Graph population complete")
+        logger.info(f"Total nodes: {len(embeddings)}")
+        logger.info(f"Total relationships: {relationship_count}")
+        
+        # Verify database state
+        node_count = db.count_images()
+        logger.info(f"Nodes in database: {node_count}")
+        
+        # Close database connection
+        db.close()
+        
+        return True
 
 if __name__ == '__main__':
     # For manual testing

@@ -1,5 +1,6 @@
 from flask import Blueprint, jsonify, request
 import logging
+import traceback
 from database import get_db_connection
 from utils.image_utils import image_exists, normalize_image_path, MISSING_IMAGE_CACHE
 from config import DEFAULT_SIMILARITY_THRESHOLD, DEFAULT_NEIGHBOR_LIMIT
@@ -155,6 +156,260 @@ def search_images():
     
     return jsonify({
         "query": query,
+        "results": formatted_results,
+        "count": len(formatted_results)
+    })
+
+@api_bp.route('/features', methods=['GET'])
+def get_available_features():
+    """Get a summary of available features for filtering/searching"""
+    db = get_db_connection()
+    
+    try:
+        # Get top tags
+        with db.driver.session() as session:
+            # Get tag counts
+            tag_result = session.run("""
+                MATCH (t:Tag)<-[:HAS_TAG]-(i:Image)
+                WITH t.name AS tag, COUNT(i) AS count
+                WHERE count >= 3  // Only include tags that appear at least 3 times
+                RETURN tag, count
+                ORDER BY count DESC
+                LIMIT 50
+            """)
+            
+            tags = [{"name": record["tag"], "count": record["count"]} for record in tag_result]
+            
+            # Get color counts
+            color_result = session.run("""
+                MATCH (c:Color)<-[:HAS_COLOR]-(i:Image)
+                WITH c.name AS color, COUNT(i) AS count
+                RETURN color, count
+                ORDER BY count DESC
+            """)
+            
+            colors = [{"name": record["color"], "count": record["count"]} for record in color_result]
+            
+            # Get object counts
+            object_result = session.run("""
+                MATCH (o:Object)<-[:CONTAINS]-(i:Image)
+                WITH o.name AS object, COUNT(i) AS count
+                WHERE count >= 2  // Only include objects that appear at least twice
+                RETURN object, count
+                ORDER BY count DESC
+                LIMIT 30
+            """)
+            
+            objects = [{"name": record["object"], "count": record["count"]} for record in object_result]
+            
+            # Get camera models
+            camera_result = session.run("""
+                MATCH (c:Camera)<-[:TAKEN_WITH]-(i:Image)
+                WITH c.model AS camera, COUNT(i) AS count
+                RETURN camera, count
+                ORDER BY count DESC
+            """)
+            
+            cameras = [{"model": record["camera"], "count": record["count"]} for record in camera_result]
+            
+            # Get image orientations
+            orientation_result = session.run("""
+                MATCH (i:Image)
+                WHERE i.basic_orientation IS NOT NULL
+                RETURN i.basic_orientation AS orientation, COUNT(i) AS count
+                ORDER BY count DESC
+            """)
+            
+            orientations = [{"name": record["orientation"], "count": record["count"]} for record in orientation_result]
+        
+        # Compile all feature data
+        feature_data = {
+            "tags": tags,
+            "colors": colors,
+            "objects": objects,
+            "cameras": cameras,
+            "orientations": orientations
+        }
+        
+        return jsonify(feature_data)
+        
+    except Exception as e:
+        logger.error(f"Error getting feature data: {e}")
+        logger.error(traceback.format_exc())
+        return jsonify({"error": "Failed to retrieve feature data"}), 500
+
+@api_bp.route('/search/advanced', methods=['GET', 'POST'])
+def advanced_search():
+    """
+    Advanced search endpoint that combines multiple feature criteria
+    
+    Supports both GET with query parameters and POST with JSON body
+    
+    Query Parameters / JSON Body:
+    - tags: comma-separated list of tags (GET) or array of tags (POST)
+    - tags_operator: "AND" or "OR" (default: "AND")
+    - colors: comma-separated list of colors (GET) or array of colors (POST)
+    - colors_operator: "AND" or "OR" (default: "OR")
+    - objects: comma-separated list of objects (GET) or array of objects (POST)
+    - objects_operator: "AND" or "OR" (default: "OR")
+    - min_confidence: minimum confidence for object detection (default: 0.5)
+    - orientation: image orientation (landscape, portrait, square)
+    - camera: camera model
+    - limit: maximum number of results (default: 50)
+    """
+    try:
+        # Get search criteria from request
+        if request.method == 'POST':
+            # For POST requests, get criteria from JSON body
+            criteria = request.json
+        else:
+            # For GET requests, get criteria from query parameters
+            criteria = {}
+            
+            # Process tags
+            tags = request.args.get('tags')
+            if tags:
+                criteria['tags'] = [tag.strip() for tag in tags.split(',')]
+                criteria['tags_operator'] = request.args.get('tags_operator', 'AND').upper()
+            
+            # Process colors
+            colors = request.args.get('colors')
+            if colors:
+                criteria['colors'] = [color.strip() for color in colors.split(',')]
+                criteria['colors_operator'] = request.args.get('colors_operator', 'OR').upper()
+            
+            # Process objects
+            objects = request.args.get('objects')
+            if objects:
+                criteria['objects'] = [obj.strip() for obj in objects.split(',')]
+                criteria['objects_operator'] = request.args.get('objects_operator', 'OR').upper()
+                
+                # Get min confidence for object detection
+                min_confidence = request.args.get('min_confidence')
+                if min_confidence:
+                    criteria['min_confidence'] = float(min_confidence)
+            
+            # Process orientation
+            orientation = request.args.get('orientation')
+            if orientation:
+                criteria['orientation'] = orientation
+            
+            # Process camera
+            camera = request.args.get('camera')
+            if camera:
+                criteria['camera'] = camera
+        
+        # Get limit parameter
+        limit = int(request.args.get('limit', 50))
+        
+        # Validate criteria
+        if not criteria:
+            return jsonify({"error": "No search criteria provided"}), 400
+        
+        # Get database connection
+        db = get_db_connection()
+        
+        # Perform the search
+        results = db.search_images_by_features(criteria, limit=limit)
+        
+        # Format the results with full URLs
+        formatted_results = []
+        for path in results:
+            formatted_results.append({
+                "path": path,
+                "url": f"/static/{path}"
+            })
+        
+        return jsonify({
+            "criteria": criteria,
+            "results": formatted_results,
+            "count": len(formatted_results)
+        })
+        
+    except Exception as e:
+        logger.error(f"Error in advanced search: {e}")
+        logger.error(traceback.format_exc())
+        return jsonify({"error": f"Search failed: {str(e)}"}), 500
+
+@api_bp.route('/search/tags', methods=['GET'])
+def search_by_tags():
+    """Search for images with specific tags"""
+    tags = request.args.get('tags')
+    operator = request.args.get('operator', 'AND').upper()
+    limit = int(request.args.get('limit', 50))
+    
+    if not tags:
+        return jsonify({"error": "tags parameter is required"}), 400
+    
+    # Parse tags
+    tag_list = [tag.strip() for tag in tags.split(',')]
+    
+    # Get database connection
+    db = get_db_connection()
+    
+    # Perform the search
+    results = db.get_images_by_tags(tag_list, operator=operator, limit=limit)
+    
+    # Format the results
+    formatted_results = [{"path": path, "url": f"/static/{path}"} for path in results]
+    
+    return jsonify({
+        "tags": tag_list,
+        "operator": operator,
+        "results": formatted_results,
+        "count": len(formatted_results)
+    })
+
+@api_bp.route('/search/color', methods=['GET'])
+def search_by_color():
+    """Search for images with a specific color"""
+    color = request.args.get('color')
+    limit = int(request.args.get('limit', 50))
+    
+    if not color:
+        return jsonify({"error": "color parameter is required"}), 400
+    
+    # Get database connection
+    db = get_db_connection()
+    
+    # Perform the search
+    results = db.get_images_by_color(color, limit=limit)
+    
+    # Format the results
+    formatted_results = [{"path": path, "url": f"/static/{path}"} for path in results]
+    
+    return jsonify({
+        "color": color,
+        "results": formatted_results,
+        "count": len(formatted_results)
+    })
+
+@api_bp.route('/search/object', methods=['GET'])
+def search_by_object():
+    """Search for images containing a specific object"""
+    object_name = request.args.get('object')
+    min_confidence = float(request.args.get('min_confidence', 0.5))
+    limit = int(request.args.get('limit', 50))
+    
+    if not object_name:
+        return jsonify({"error": "object parameter is required"}), 400
+    
+    # Get database connection
+    db = get_db_connection()
+    
+    # Perform the search
+    results = db.get_images_containing_object(object_name, min_confidence=min_confidence, limit=limit)
+    
+    # Format the results
+    formatted_results = [{
+        "path": result["path"], 
+        "url": f"/static/{result['path']}",
+        "confidence": result["confidence"]
+    } for result in results]
+    
+    return jsonify({
+        "object": object_name,
+        "min_confidence": min_confidence,
         "results": formatted_results,
         "count": len(formatted_results)
     })

@@ -26,3 +26,6 @@ yarn-error.log*
 __pycache__/
 *.pyc
 *.pyo
+
+#image libraries for testing
+/im2

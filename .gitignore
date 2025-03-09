@@ -10,3 +10,5 @@ backend/routes/__pycache__/static_routes.cpython-310.pyc
 backend/utils/__pycache__/db_performance.cpython-310.pyc
 backend/utils/__pycache__/image_utils.cpython-310.pyc
 frontend/package-lock.json
+/im2
+/frontend/public/src/im2

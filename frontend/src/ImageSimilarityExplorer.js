@@ -11,7 +11,7 @@ import _ from 'lodash';
 const ImageSimilarityExplorer = () => {
   // State management
   const [graphData, setGraphData] = useState({ nodes: [], links: [] });
-  const [centerImage, setCenterImage] = useState('2147121972.jpg');
+  const [centerImage, setCenterImage] = useState('suncorp_stadium01.jpg');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [similarityThreshold, setSimilarityThreshold] = useState(0.63);
