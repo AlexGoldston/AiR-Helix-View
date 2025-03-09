@@ -32,6 +32,7 @@ print("Importing routes...")
 from routes.admin_routes import admin_bp
 from routes.api_routes import api_bp
 from routes.static_routes import static_bp
+from routes.simple_admin import simple_admin_bp
 
 print("Importing utils...")
 from utils.image_utils import save_placeholder_image, normalize_image_path
@@ -71,6 +72,7 @@ def create_app():
         app.register_blueprint(admin_bp)
         app.register_blueprint(api_bp)
         app.register_blueprint(static_bp)
+        app.register_blueprint(simple_admin_bp)
         
         # Additional static file route as a fallback
         @app.route('/static/<path:filename>')

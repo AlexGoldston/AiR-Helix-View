@@ -468,7 +468,7 @@ def normalize_image_path(path):
     # Get just the filename without any path
     return os.path.basename(path)
 
-def populate_graph(image_dir, similarity_threshold=0.7, generate_descriptions=True, use_ml_descriptions=True):
+def populate_graph(image_dir, similarity_threshold=0.7, generate_descriptions=True, use_ml_descriptions=True, force_gpu=False):
     """
     Populate the Neo4j graph database with image nodes and their similarities
     
@@ -482,6 +482,7 @@ def populate_graph(image_dir, similarity_threshold=0.7, generate_descriptions=Tr
     logger.info(f"Similarity threshold: {similarity_threshold}")
     logger.info(f"Generate descriptions: {generate_descriptions}")
     logger.info(f"Use ML descriptions: {use_ml_descriptions}")
+    logger.info(f"Force GPU usage: {force_gpu}")
     
     # Validate image directory
     if not os.path.exists(image_dir):
@@ -499,8 +500,10 @@ def populate_graph(image_dir, similarity_threshold=0.7, generate_descriptions=Tr
             # Import the description generator
             try:
                 from utils.image_description import get_description_generator
-                description_generator = get_description_generator(use_ml=use_ml_descriptions)
+                description_generator = get_description_generator(use_ml=use_ml_descriptions, force_gpu=force_gpu)
                 logger.info(f"Using {'ML-based' if use_ml_descriptions else 'basic'} description generator")
+                if force_gpu:
+                    logger.info("GPU usage requested for image descriptions")
             except Exception as e:
                 logger.warning(f"Failed to initialize description generator: {e}")
                 logger.warning("Descriptions will not be generated")
