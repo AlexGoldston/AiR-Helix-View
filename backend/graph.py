@@ -540,7 +540,7 @@ class Neo4jConnection:
         # 2. Store complex features as serialized JSON
         if features:
             # Serialize the features dictionary to JSON
-            features_json = json.dumps(features)
+            features_json = json.dumps(features, default=lambda o: str(o) if isinstance(o, (bool, set)) else o)
             tx.run(
                 """
                 MATCH (i:Image {path: $path})
