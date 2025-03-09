@@ -127,3 +127,34 @@ def get_extended_neighbors():
     }
     
     return jsonify(filtered_data)
+
+@api_bp.route('/search', methods=['GET'])
+def search_images():
+    """Search for images based on text description"""
+    query = request.args.get('query')
+    limit = int(request.args.get('limit', 10))
+    
+    if not query:
+        return jsonify({"error": "query parameter is required"}), 400
+        
+    # Get database connection
+    db = get_db_connection()
+    
+    # Search by text
+    results = db.search_images_by_text(query, limit=limit)
+    
+    # Format the results
+    formatted_results = []
+    for result in results:
+        formatted_result = {
+            "id": result.get("id"),
+            "path": result.get("path"),
+            "description": result.get("description", "No description available")
+        }
+        formatted_results.append(formatted_result)
+    
+    return jsonify({
+        "query": query,
+        "results": formatted_results,
+        "count": len(formatted_results)
+    })

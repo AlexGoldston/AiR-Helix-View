@@ -9,6 +9,7 @@ import numpy as np
 import glob
 import logging
 from utils.db_performance import track_query_performance
+import traceback  # Added for better error logging
 
 # Configure logging
 logger = logging.getLogger('image-similarity')
@@ -117,7 +118,7 @@ class Neo4jConnection:
                 # First find the center node
                 center_node_query = """
                 MATCH (center:Image {path: $image_path})
-                RETURN id(center) as id, center.path as path
+                RETURN id(center) as id, center.path as path, center.description as description
                 """
                 
                 center_node_result = session.run(center_node_query, image_path=image_path)
@@ -130,11 +131,13 @@ class Neo4jConnection:
                 # Get center node details
                 center_id = center_node_record['id']
                 center_path = center_node_record['path']
+                center_description = center_node_record.get('description')
                 
                 # Add center node to result
                 result['nodes'].append({
                     'id': str(center_id),
                     'path': center_path,
+                    'description': center_description,
                     'isCenter': True
                 })
                 
@@ -144,7 +147,8 @@ class Neo4jConnection:
                 WHERE r.similarity >= $threshold
                 RETURN 
                     id(neighbor) as id, 
-                    neighbor.path as path, 
+                    neighbor.path as path,
+                    neighbor.description as description,
                     r.similarity as similarity
                 ORDER BY r.similarity DESC
                 LIMIT $limit
@@ -162,12 +166,14 @@ class Neo4jConnection:
                 for record in neighbors_result:
                     neighbor_id = str(record['id'])
                     neighbor_path = record['path']
+                    neighbor_description = record.get('description')
                     similarity = record['similarity']
                     
                     # Add neighbor node
                     result['nodes'].append({
                         'id': neighbor_id,
                         'path': neighbor_path,
+                        'description': neighbor_description,
                         'isCenter': False
                     })
                     
@@ -230,7 +236,7 @@ class Neo4jConnection:
                     # Find node in database
                     node_query = """
                     MATCH (node:Image {path: $path})
-                    RETURN id(node) as id, node.path as path
+                    RETURN id(node) as id, node.path as path, node.description as description
                     """
                     
                     node_result = session.run(node_query, path=current_path)
@@ -243,6 +249,7 @@ class Neo4jConnection:
                     # Get node details
                     node_id = str(node_record['id'])
                     node_path = node_record['path']
+                    node_description = node_record.get('description')
                     
                     # Store node ID mapping
                     node_ids[node_path] = node_id
@@ -252,6 +259,7 @@ class Neo4jConnection:
                         result['nodes'].append({
                             'id': node_id,
                             'path': node_path,
+                            'description': node_description,
                             'isCenter': current_path == image_path,
                             'level': current_level
                         })
@@ -266,7 +274,8 @@ class Neo4jConnection:
                     WHERE r.similarity >= $threshold
                     RETURN 
                         id(neighbor) as id, 
-                        neighbor.path as path, 
+                        neighbor.path as path,
+                        neighbor.description as description,
                         r.similarity as similarity
                     ORDER BY r.similarity DESC
                     LIMIT $limit
@@ -283,6 +292,7 @@ class Neo4jConnection:
                     for record in neighbors_result:
                         neighbor_id = str(record['id'])
                         neighbor_path = record['path']
+                        neighbor_description = record.get('description')
                         similarity = record['similarity']
                         
                         # Store neighbor ID mapping
@@ -297,6 +307,7 @@ class Neo4jConnection:
                             result['nodes'].append({
                                 'id': neighbor_id,
                                 'path': neighbor_path,
+                                'description': neighbor_description,
                                 'isCenter': False,
                                 'level': current_level + 1
                             })
@@ -324,8 +335,34 @@ class Neo4jConnection:
             logger.error(f"Error fetching extended neighbors for {image_path}: {e}")
             
         return result
-
-
+    
+    def search_images_by_text(self, text_query, limit=10):
+        """
+        Search for images based on description text similarity
+        
+        Args:
+            text_query (str): The text to search for
+            limit (int): Maximum number of results to return
+            
+        Returns:
+            list: List of image nodes matching the query
+        """
+        with self.driver.session() as session:
+            try:
+                # Use a simple CONTAINS query
+                query = """
+                MATCH (i:Image)
+                WHERE i.description IS NOT NULL 
+                AND toLower(i.description) CONTAINS toLower($text_query)
+                RETURN i.path as path, i.description as description, id(i) as id
+                LIMIT $limit
+                """
+                
+                result = session.run(query, text_query=text_query, limit=limit)
+                return [dict(record) for record in result]
+            except Exception as e:
+                logger.error(f"Error searching images by text: {e}")
+                return []
         
     def remove_images(self, image_paths):
         """Remove image nodes and their relationships"""
@@ -352,14 +389,15 @@ class Neo4jConnection:
         record = result.single()
         return record["count"] if record else 0
     
-    def create_image_node(self, image_path, embedding):
-        """Create a single image node with its embedding"""
+    def create_image_node(self, image_path, embedding, description=None):
+        """Create a single image node with its embedding and description"""
         with self.driver.session() as session:
             try:
                 result = session.execute_write(
                     self._create_image_node_tx, 
                     image_path, 
-                    embedding
+                    embedding,
+                    description
                 )
                 return result
             except Exception as e:
@@ -367,13 +405,13 @@ class Neo4jConnection:
                 return None
     
     @staticmethod
-    def _create_image_node_tx(tx, image_path, embedding):
+    def _create_image_node_tx(tx, image_path, embedding, description=None):
         try:
             query = (
-                "CREATE (i:Image {path: $image_path, embedding: $embedding}) "
+                "CREATE (i:Image {path: $image_path, embedding: $embedding, description: $description}) "
                 "RETURN i"
             )
-            result = tx.run(query, image_path=image_path, embedding=embedding)
+            result = tx.run(query, image_path=image_path, embedding=embedding, description=description)
             record = result.single()
             return {"id": record["i"].element_id, "path": record["i"]["path"]} if record else None
         except Exception as e:
@@ -430,15 +468,20 @@ def normalize_image_path(path):
     # Get just the filename without any path
     return os.path.basename(path)
 
-def populate_graph(image_dir, similarity_threshold=0.7):
+def populate_graph(image_dir, similarity_threshold=0.7, generate_descriptions=True, use_ml_descriptions=True):
     """
     Populate the Neo4j graph database with image nodes and their similarities
     
-    :param image_dir: Directory containing images
-    :param similarity_threshold: Minimum similarity to create a relationship
+    Args:
+        image_dir (str): Directory containing images
+        similarity_threshold (float): Minimum similarity to create a relationship
+        generate_descriptions (bool): Whether to generate descriptions for images
+        use_ml_descriptions (bool): Whether to use ML-based descriptions when available
     """
     logger.info(f"Starting graph population from {image_dir}")
     logger.info(f"Similarity threshold: {similarity_threshold}")
+    logger.info(f"Generate descriptions: {generate_descriptions}")
+    logger.info(f"Use ML descriptions: {use_ml_descriptions}")
     
     # Validate image directory
     if not os.path.exists(image_dir):
@@ -449,6 +492,18 @@ def populate_graph(image_dir, similarity_threshold=0.7):
     try:
         embedder = ImageEmbedder()
         db = Neo4jConnection()
+        
+        # Initialize description generator if needed
+        description_generator = None
+        if generate_descriptions:
+            # Import the description generator
+            try:
+                from utils.image_description import get_description_generator
+                description_generator = get_description_generator(use_ml=use_ml_descriptions)
+                logger.info(f"Using {'ML-based' if use_ml_descriptions else 'basic'} description generator")
+            except Exception as e:
+                logger.warning(f"Failed to initialize description generator: {e}")
+                logger.warning("Descriptions will not be generated")
     except Exception as e:
         logger.error(f"Failed to initialize embedder or database: {e}")
         return False
@@ -471,10 +526,11 @@ def populate_graph(image_dir, similarity_threshold=0.7):
     
     # Process and store image embeddings
     embeddings = {}
+    descriptions = {}
     successful_nodes = 0
     failed_nodes = 0
     
-    # First pass: generate embeddings
+    # First pass: generate embeddings and descriptions
     for image_path in image_paths:
         try:
             # Get just the filename
@@ -482,6 +538,24 @@ def populate_graph(image_dir, similarity_threshold=0.7):
             
             # Generate embedding
             embedding = embedder.get_embedding(image_path)
+            
+            # Generate description if requested
+            description = None
+            if generate_descriptions and description_generator:
+                try:
+                    # Generate description using the appropriate generator
+                    if callable(description_generator):
+                        # Basic description function
+                        description = description_generator(image_path)
+                    else:
+                        # ML-based description generator object
+                        description = description_generator.generate_description(image_path)
+                    
+                    descriptions[filename] = description
+                    logger.info(f"Generated description for {filename}: {description}")
+                except Exception as desc_error:
+                    logger.error(f"Error generating description for {filename}: {desc_error}")
+                    logger.error(traceback.format_exc())
             
             if embedding is not None:
                 embeddings[filename] = embedding
@@ -494,11 +568,14 @@ def populate_graph(image_dir, similarity_threshold=0.7):
             logger.error(f"Error processing {image_path}: {e}")
     
     logger.info(f"Embeddings generated: {successful_nodes} successful, {failed_nodes} failed")
+    logger.info(f"Descriptions generated: {len(descriptions)}")
     
     # Second pass: create nodes
     for filename, embedding in embeddings.items():
         try:
-            db.create_image_node(filename, embedding)
+            # Get description if available
+            description = descriptions.get(filename)
+            db.create_image_node(filename, embedding, description)
         except Exception as e:
             logger.error(f"Failed to create node for {filename}: {e}")
     
@@ -538,4 +615,4 @@ def populate_graph(image_dir, similarity_threshold=0.7):
 
 if __name__ == '__main__':
     # For manual testing
-    populate_graph('../frontend/public/images')
+    populate_graph('../frontend/public/images', generate_descriptions=True, use_ml_descriptions=True)
