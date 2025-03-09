@@ -10,6 +10,7 @@ import glob
 import logging
 from utils.db_performance import track_query_performance
 import traceback  # Added for better error logging
+from tqdm import tqdm  # For progress tracking
 
 # Configure logging
 logger = logging.getLogger('image-similarity')
@@ -477,6 +478,7 @@ def populate_graph(image_dir, similarity_threshold=0.7, generate_descriptions=Tr
         similarity_threshold (float): Minimum similarity to create a relationship
         generate_descriptions (bool): Whether to generate descriptions for images
         use_ml_descriptions (bool): Whether to use ML-based descriptions when available
+        force_gpu (bool): Whether to force GPU usage for descriptions if available
     """
     logger.info(f"Starting graph population from {image_dir}")
     logger.info(f"Similarity threshold: {similarity_threshold}")
@@ -500,15 +502,38 @@ def populate_graph(image_dir, similarity_threshold=0.7, generate_descriptions=Tr
             # Import the description generator
             try:
                 from utils.image_description import get_description_generator
+                # Pass both parameters to get_description_generator
                 description_generator = get_description_generator(use_ml=use_ml_descriptions, force_gpu=force_gpu)
                 logger.info(f"Using {'ML-based' if use_ml_descriptions else 'basic'} description generator")
                 if force_gpu:
                     logger.info("GPU usage requested for image descriptions")
+                    
+                # Test the description generator
+                if description_generator:
+                    try:
+                        # Find a sample image to test
+                        sample_images = glob.glob(os.path.join(image_dir, '*.jpg'))
+                        if sample_images:
+                            test_image = sample_images[0]
+                            logger.info(f"Testing description generator with image: {test_image}")
+                            
+                            if callable(description_generator):
+                                test_desc = description_generator(test_image)
+                            else:
+                                test_desc = description_generator.generate_description(test_image)
+                                
+                            logger.info(f"Test description: {test_desc}")
+                    except Exception as test_error:
+                        logger.error(f"Description generator test failed: {test_error}")
+                        logger.error(traceback.format_exc())
             except Exception as e:
                 logger.warning(f"Failed to initialize description generator: {e}")
+                logger.warning(traceback.format_exc())
                 logger.warning("Descriptions will not be generated")
+                description_generator = None
     except Exception as e:
         logger.error(f"Failed to initialize embedder or database: {e}")
+        logger.error(traceback.format_exc())
         return False
     
     # Clear existing database
@@ -533,32 +558,14 @@ def populate_graph(image_dir, similarity_threshold=0.7, generate_descriptions=Tr
     successful_nodes = 0
     failed_nodes = 0
     
-    # First pass: generate embeddings and descriptions
-    for image_path in image_paths:
+    # First pass: generate embeddings (separate from descriptions for better organization)
+    for image_path in tqdm(image_paths, desc="Generating embeddings"):
         try:
             # Get just the filename
             filename = normalize_image_path(image_path)
             
             # Generate embedding
             embedding = embedder.get_embedding(image_path)
-            
-            # Generate description if requested
-            description = None
-            if generate_descriptions and description_generator:
-                try:
-                    # Generate description using the appropriate generator
-                    if callable(description_generator):
-                        # Basic description function
-                        description = description_generator(image_path)
-                    else:
-                        # ML-based description generator object
-                        description = description_generator.generate_description(image_path)
-                    
-                    descriptions[filename] = description
-                    logger.info(f"Generated description for {filename}: {description}")
-                except Exception as desc_error:
-                    logger.error(f"Error generating description for {filename}: {desc_error}")
-                    logger.error(traceback.format_exc())
             
             if embedding is not None:
                 embeddings[filename] = embedding
@@ -569,12 +576,103 @@ def populate_graph(image_dir, similarity_threshold=0.7, generate_descriptions=Tr
         except Exception as e:
             failed_nodes += 1
             logger.error(f"Error processing {image_path}: {e}")
+            logger.error(traceback.format_exc())
     
     logger.info(f"Embeddings generated: {successful_nodes} successful, {failed_nodes} failed")
+    
+    # Second pass: generate descriptions
+    if generate_descriptions and description_generator:
+        # Check if the description generator supports batch processing
+        has_batch_support = hasattr(description_generator, 'generate_descriptions_batch')
+        
+        if has_batch_support and not callable(description_generator):
+            # Use batch processing for ML-based descriptions
+            logger.info("Using batch processing for descriptions")
+            
+            # Get paths for images that have embeddings
+            valid_image_paths = []
+            path_to_filename = {}  # Map from full path to normalized filename
+            
+            for image_path in image_paths:
+                filename = normalize_image_path(image_path)
+                if filename in embeddings:
+                    valid_image_paths.append(image_path)
+                    path_to_filename[image_path] = filename
+            
+            # Define optimal batch size based on available GPU memory
+            # Smaller batch size for larger images, larger for smaller images
+            batch_size = 8  # Default value, adjust based on your GPU memory
+            
+            # Process in batches
+            logger.info(f"Processing {len(valid_image_paths)} images in batches of {batch_size}")
+            
+            try:
+                # Generate descriptions in batches
+                batch_results = description_generator.generate_descriptions_batch(
+                    valid_image_paths, 
+                    batch_size=batch_size,
+                    max_length=50
+                )
+                
+                # Convert to our format (filename -> description)
+                for full_path, desc in batch_results.items():
+                    filename = path_to_filename.get(full_path) or normalize_image_path(full_path)
+                    if filename and desc:
+                        descriptions[filename] = desc
+                
+                logger.info(f"Generated {len(descriptions)} descriptions using batch processing")
+                
+            except Exception as batch_error:
+                logger.error(f"Batch description generation failed: {batch_error}")
+                logger.error(traceback.format_exc())
+                logger.warning("Falling back to individual processing")
+                
+                # Fallback to individual processing
+                for image_path in tqdm(valid_image_paths, desc="Generating descriptions (fallback)"):
+                    try:
+                        filename = normalize_image_path(image_path)
+                        
+                        # Generate description
+                        if callable(description_generator):
+                            description = description_generator(image_path)
+                        else:
+                            description = description_generator.generate_description(image_path)
+                        
+                        if description:
+                            descriptions[filename] = description
+                    except Exception as e:
+                        logger.error(f"Error generating description for {filename}: {e}")
+                
+        else:
+            # Process descriptions individually (for basic description function or when batch not supported)
+            logger.info("Using individual processing for descriptions")
+            
+            for image_path in tqdm(image_paths, desc="Generating descriptions"):
+                try:
+                    filename = normalize_image_path(image_path)
+                    
+                    # Skip if embedding generation failed
+                    if filename not in embeddings:
+                        continue
+                    
+                    # Generate description
+                    if callable(description_generator):
+                        description = description_generator(image_path)
+                    else:
+                        description = description_generator.generate_description(image_path)
+                    
+                    if description:
+                        descriptions[filename] = description
+                        # Log a snippet of the description to avoid cluttering logs
+                        logger.debug(f"Generated description for {filename}: {description[:50]}...")
+                except Exception as e:
+                    logger.error(f"Error generating description for {filename}: {e}")
+                    logger.error(traceback.format_exc())
+    
     logger.info(f"Descriptions generated: {len(descriptions)}")
     
-    # Second pass: create nodes
-    for filename, embedding in embeddings.items():
+    # Third pass: create nodes
+    for filename, embedding in tqdm(embeddings.items(), desc="Creating nodes"):
         try:
             # Get description if available
             description = descriptions.get(filename)
@@ -582,11 +680,12 @@ def populate_graph(image_dir, similarity_threshold=0.7, generate_descriptions=Tr
         except Exception as e:
             logger.error(f"Failed to create node for {filename}: {e}")
     
-    # Third pass: create similarity relationships
+    # Fourth pass: create similarity relationships
     relationship_count = 0
     filenames = list(embeddings.keys())
     
-    for i, filename1 in enumerate(filenames):
+    logger.info("Creating similarity relationships...")
+    for i, filename1 in enumerate(tqdm(filenames, desc="Creating relationships")):
         for filename2 in filenames[i+1:]:
             try:
                 # Calculate similarity

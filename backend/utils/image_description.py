@@ -2,6 +2,7 @@ from PIL import Image
 import logging
 import os
 import time
+import traceback
 
 logger = logging.getLogger('image-similarity')
 
@@ -28,15 +29,19 @@ class ImageDescriptionGenerator:
         
         logger.info(f"initialising ImageDescriptionGenerator with model: {model_name}")
         self.model_name = model_name
-        self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        logger.info(f"using device {self.device}")
 
-
-        #lod the model and processor
+        #load the model and processor
         try:
             self.processor = AutoProcessor.from_pretrained(model_name)
+            # Load model directly to the correct device
             self.model = AutoModelForCausalLM.from_pretrained(model_name).to(self.device)
-            logger.info("Model loaded successfully")
+            logger.info(f"Model loaded successfully on {self.device}")
+
+            # additional logging for GPU info if using CUDA
+            if self.device == "cuda":
+                logger.info(f"GPU: {torch.cuda.get_device_name(0)}")
+                logger.info(f"CUDA version: {torch.version.cuda}")
+    
         except Exception as e:
             logger.error(f"error loading model: {e}")
             raise
@@ -79,7 +84,76 @@ class ImageDescriptionGenerator:
         except Exception as e:
             logger.error(f"error generating description for {image_path}: {e}")
             return "error generating description"
-    
+
+    def generate_descriptions_batch(self, image_paths, batch_size=8, max_length=50):
+            """
+            Generate descriptions for multiple images in batches
+            
+            Args:
+                image_paths (list): List of paths to images
+                batch_size (int): Number of images to process at once
+                max_length (int): Maximum length of descriptions
+                
+            Returns:
+                dict: Mapping of image paths to descriptions
+            """
+            results = {}
+            start_time = time.time()
+            
+            for i in range(0, len(image_paths), batch_size):
+                batch_paths = image_paths[i:i+batch_size]
+                batch_size_actual = len(batch_paths)
+                
+                try:
+                    logger.info(f"Processing batch {i//batch_size + 1} ({batch_size_actual} images)")
+                    
+                    # Load images in parallel
+                    batch_images = []
+                    valid_indices = []
+                    
+                    for idx, path in enumerate(batch_paths):
+                        try:
+                            if os.path.exists(path):
+                                img = Image.open(path).convert('RGB')
+                                batch_images.append(img)
+                                valid_indices.append(idx)
+                            else:
+                                logger.warning(f"Image not found: {path}")
+                        except Exception as e:
+                            logger.error(f"Error opening image {path}: {e}")
+                    
+                    if not batch_images:
+                        logger.warning("No valid images in batch")
+                        continue
+                    
+                    # Process batch
+                    inputs = self.processor(images=batch_images, return_tensors="pt").to(self.device)
+                    
+                    with torch.no_grad():
+                        generated_ids = self.model.generate(
+                            **inputs,
+                            max_length=max_length,
+                            num_beams=4,
+                            early_stopping=True
+                        )
+                    
+                    # Decode outputs
+                    descriptions = self.processor.batch_decode(generated_ids, skip_special_tokens=True)
+                    
+                    # Associate descriptions with original paths
+                    for desc_idx, img_idx in enumerate(valid_indices):
+                        if desc_idx < len(descriptions):
+                            original_path = batch_paths[img_idx]
+                            results[original_path] = descriptions[desc_idx]
+                    
+                except Exception as e:
+                    logger.error(f"Error processing batch: {e}")
+                    logger.error(traceback.format_exc())
+            
+            elapsed_time = time.time() - start_time
+            logger.info(f"Generated {len(results)} descriptions in {elapsed_time:.2f} seconds")
+            return results
+        
 # Fallback description generator using basic image properties
 def generate_basic_description(image_path):
     """
@@ -177,7 +251,7 @@ def generate_basic_description(image_path):
         return "Image file (no description available)"
 
 # Get the most appropriate description generator based on available libraries
-def get_description_generator(use_ml=True):
+def get_description_generator(use_ml=True, force_gpu=False):
     """
     Get the most appropriate description generator based on available libraries.
     
@@ -189,6 +263,9 @@ def get_description_generator(use_ml=True):
     """
     if use_ml and TRANSFORMERS_AVAILABLE:
         try:
+            if force_gpu and torch.cuda.is_available():
+                logger.info("Forcing GPU usage for image descriptions")
+                os.environ["CUDA_VISIBLE_DEVICES"] = "0"
             return ImageDescriptionGenerator()
         except Exception as e:
             logger.warning(f"Failed to initialize ML description generator: {e}")
