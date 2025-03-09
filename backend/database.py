@@ -16,17 +16,28 @@ logger = logging.getLogger('image-similarity')
 
 # Global database connection
 _db_instance = None
+_db_init_in_progress = False
 
 def get_db_connection():
     """Get a Neo4j database connection, creating it if necessary"""
-    global _db_instance
+    global _db_instance, _db_init_in_progress
     
-    # Load environment variables again to ensure they're available
-    load_dotenv()
+    # If already initializing in another thread, wait a bit to avoid duplicate initialization
+    if _db_init_in_progress:
+        logger.info("Database initialization already in progress, waiting...")
+        for _ in range(10):  # Wait up to 10 seconds
+            if _db_instance is not None:
+                return _db_instance
+            time.sleep(1)
     
+    # If still not initialized, initialize now
     if _db_instance is None:
         try:
+            _db_init_in_progress = True
             logger.info(f"Initializing Neo4j connection to {NEO4J_URI}")
+            
+            # Load environment variables again to ensure they're available
+            load_dotenv()
             
             # Import Neo4j driver first
             import neo4j
@@ -63,6 +74,8 @@ def get_db_connection():
             # Create dummy DB to prevent crashes
             _db_instance = DummyDB()
             logger.warning("Using dummy database - functionality will be limited")
+        finally:
+            _db_init_in_progress = False
     
     return _db_instance
 
@@ -110,7 +123,6 @@ class DummyDB:
             raise Exception("No database connection - using DummyDB")
     
     driver = DummyDriver()
-
 
 def test_db_connection():
     """Test the database connection and return diagnostic information"""

@@ -1,7 +1,7 @@
 from flask import Flask, send_from_directory
 from flask_cors import CORS
 import os
-import glob
+# import glob
 import logging
 import traceback
 import sys
@@ -9,9 +9,22 @@ import threading
 import time
 import signal
 import atexit
-from concurrent.futures import ThreadPoolExecutor, TimeoutError
+import argparse
+# from concurrent.futures import ThreadPoolExecutor, TimeoutError
 
-os.environ["NEO4J_RUST_EXT_DEBUG"] = "0" 
+# Parse command line arguments
+parser = argparse.ArgumentParser(description='Image Similarity Explorer Backend')
+parser.add_argument('--skip-db-init', action='store_true', 
+                    help='Skip database initialization on startup (faster startup)')
+parser.add_argument('--debug', action='store_true',
+                    help='Run in debug mode (more verbose logging)')
+args = parser.parse_args()
+
+# Configure Rust extension debugging based on debug flag
+if args.debug:
+    os.environ["NEO4J_RUST_EXT_DEBUG"] = "1"
+else:
+    os.environ["NEO4J_RUST_EXT_DEBUG"] = "0" 
 
 print("Starting import of modules...")
 
@@ -21,11 +34,9 @@ from routes.api_routes import api_bp
 from routes.static_routes import static_bp
 
 print("Importing utils...")
-# Import the helper functions first
 from utils.image_utils import save_placeholder_image, normalize_image_path
 from config import IMAGES_DIR, IMAGE_EXTENSIONS
 
-# Initialize bare logging first
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
@@ -37,7 +48,7 @@ logging.basicConfig(
 logger = logging.getLogger('image-similarity')
 logger.info("Basic logging initialized")
 
-# Global references for proper shutdown
+# Global references for shutdown
 server = None
 server_thread = None
 shutdown_requested = False
@@ -119,7 +130,7 @@ def close_logging_handlers():
         except Exception as e:
             print(f"Error closing root logger handler: {e}")
     
-    # Be extra sure by closing all loggers
+    # Close all loggers
     for name in logging.root.manager.loggerDict:
         log = logging.getLogger(name)
         for handler in log.handlers[:]:
@@ -140,7 +151,7 @@ def shutdown_server():
     shutdown_requested = True
     print("Shutting down server...")
     
-    # First try to stop the server gracefully
+    # try to stop the server gracefully
     if server:
         try:
             server.shutdown()
@@ -182,6 +193,29 @@ def main():
         # Create a placeholder image at startup - this should be quick
         print("Creating placeholder image...")
         save_placeholder_image()
+
+        # Modify database initialization behavior based on skip-db-init flag
+        if args.skip_db_init:
+            logger.info("Skipping database initialization at startup (--skip-db-init flag used)")
+            # Import a modified version of get_db_connection so we don't trigger Neo4j connection
+            from database import get_db_connection as original_get_db_conn
+            
+            # Override the database module's get_db_connection function with a lazy version
+            import database
+            
+            # Original function is now wrapped to be lazy
+            def lazy_get_db_connection():
+                logger.info("Lazy database connection requested")
+                return original_get_db_conn()
+            
+            # Replace the function with our lazy version
+            database.get_db_connection = lazy_get_db_connection
+            logger.info("Database initialization deferred until first use")
+        else:
+            logger.info("Initializing database connection at startup")
+            # This will trigger the database connection initialization
+            from database import get_db_connection
+            logger.info("Database initialization complete")
         
         # Start the application
         print("Creating Flask application...")
@@ -199,6 +233,8 @@ def main():
         server_thread.start()
 
         print('Flask server started - press ctrl+c to stop')
+        if args.skip_db_init:
+            print('Database initialization skipped - will connect on first database access')
         
         # Run until interrupted
         while server_thread.is_alive() and not shutdown_requested:
