@@ -12,8 +12,7 @@ const ImageSimilarityExplorer = () => {
   const [centerImage, setCenterImage] = useState('allianz_stadium_sydney01.jpg');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [similarityThreshold, setSimilarityThreshold] = useState(0.63);
-  const [neighborLimit, setNeighborLimit] = useState(20);
+  const [similarityThreshold, setSimilarityThreshold] = useState(0.35);
   const [debugData, setDebugData] = useState(null);
   const [showDebugPanel, setShowDebugPanel] = useState(false);
   const [openModal, setOpenModal] = useState(false);
@@ -21,10 +20,11 @@ const ImageSimilarityExplorer = () => {
   const [expandedNodes, setExpandedNodes] = useState(new Set());
   const [isAutoLoadingEnabled, setIsAutoLoadingEnabled] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [maxNodesLimit, setMaxNodesLimit] = useState(200);
+  const [maxNodesLimit, setMaxNodesLimit] = useState(1000);
   const [extendedMode, setExtendedMode] = useState(true);  // Enable by default
   const [neighborDepth, setNeighborDepth] = useState(3);  // Default to 3 for extended mode
-  const [limitPerLevel, setLimitPerLevel] = useState(10);
+  const [neighborLimit, setNeighborLimit] = useState(200);
+  const [limitPerLevel, setLimitPerLevel] = useState(20);
   const [showControls, setShowControls] = useState(false);
   
   // Refs
@@ -108,13 +108,7 @@ const ImageSimilarityExplorer = () => {
 
   // updated loading queue function
   const processLoadQueue = useCallback(async () => {
-    // Clear queue if we're not processing or had an error
-    if (!processingQueue.current) {
-      console.log("Starting queue processing");
-    }
-    
     if (loadQueue.current.length === 0) {
-      console.log("Queue empty, stopping processing");
       processingQueue.current = false;
       setLoadingMore(false);
       return;
@@ -133,155 +127,106 @@ const ImageSimilarityExplorer = () => {
     setLoadingMore(true);
     
     try {
-      // Take first node from the queue
-      const nodeId = loadQueue.current.shift();
+      // Process multiple nodes at once (batch processing)
+      const nodesToProcess = loadQueue.current.splice(0, 3); // Process 3 at a time
       
-      if (!nodeId) {
-        console.warn("Attempted to process undefined nodeId");
+      // Skip nodes that are already expanded
+      const nodesToFetch = nodesToProcess.filter(nodeId => !expandedNodes.has(nodeId));
+      
+      if (nodesToFetch.length === 0) {
         setLoadingMore(false);
-        processingQueue.current = false;
+        setTimeout(processLoadQueue, 50);
         return;
       }
       
-      // Skip if already expanded
-      if (expandedNodes.has(nodeId)) {
-        console.log(`Node ${nodeId} already expanded, skipping`);
-        setLoadingMore(false);
-        setTimeout(() => processLoadQueue(), 50);
-        return;
-      }
-      
-      // Find the node in the current graph data
-      const node = graphData.nodes.find(n => n.id === nodeId);
-      if (!node) {
-        console.warn(`Node ${nodeId} not found in graph data`);
-        setLoadingMore(false);
-        setTimeout(() => processLoadQueue(), 50);
-        return;
-      }
-    
-      console.log(`Expanding node: ${node.path} (ID: ${nodeId})`);
-      
-      // Defensive check for valid path
-      if (!node.path) {
-        console.error(`Node ${nodeId} has no path property`);
-        setLoadingMore(false);
-        setTimeout(() => processLoadQueue(), 50);
-        return;
-      }
-      
-      // Load neighbors for this node
-      const filename = getImageName(node.path);
-      
-      if (!filename) {
-        console.error(`Failed to get filename from path: ${node.path}`);
-        setLoadingMore(false);
-        setTimeout(() => processLoadQueue(), 50);
-        return;
-      }
-      
-      console.log(`Fetching neighbors for ${filename}`);
-      const response = await fetch(
-        `http://localhost:5001/neighbors?image_path=${encodeURIComponent(filename)}&threshold=${similarityThreshold}&limit=${neighborLimit}`
-      );
-      
-      if (!response.ok) {
-        throw new Error(`API error: ${response.status}`);
-      }
-      
-      const data = await response.json();
-      console.log(`Received ${data.nodes?.length || 0} nodes and ${data.edges?.length || 0} edges`);
-      
-      // Validate response data
-      if (!data.nodes || !Array.isArray(data.nodes) || !data.edges || !Array.isArray(data.edges)) {
-        console.error("Invalid response data structure:", data);
-        setLoadingMore(false);
-        setTimeout(() => processLoadQueue(), 50);
-        return;
-      }
-      
-      // Create a deep copy of the current graph data
-      const newGraphData = {
-        nodes: [...graphData.nodes],
-        links: [...graphData.links]
-      };
-    
-      // Track added nodes to avoid duplicates
-      const addedNodeIds = new Set();
-    
-      // Add new nodes that don't already exist
-      data.nodes.forEach(node => {
-        if (!node || !node.id || !node.path) {
-          console.warn("Skipping invalid node:", node);
-          return;
-        }
+      // Fetch each node's neighbors in parallel
+      const fetchPromises = nodesToFetch.map(async (nodeId) => {
+        // Find the node in the current graph data
+        const node = graphData.nodes.find(n => n.id === nodeId);
+        if (!node || !node.path) return null;
         
-        if (!newGraphData.nodes.some(n => n.id === node.id)) {
-          addedNodeIds.add(node.id);
-          newGraphData.nodes.push({
-            id: node.id,
-            path: node.path,
-            label: node.label || getImageName(node.path) || "Unknown",
-            description: node.description || "",
-            isCenter: node.isCenter || false,
-            level: node.level !== undefined ? node.level : 1
-          });
-        }
+        // Get filename and make API request
+        const filename = getImageName(node.path);
+        const response = await fetch(
+          `http://localhost:5001/neighbors?image_path=${encodeURIComponent(filename)}&threshold=${similarityThreshold}&limit=${neighborLimit}`
+        );
+        
+        if (!response.ok) throw new Error(`API error for ${filename}: ${response.status}`);
+        
+        const data = await response.json();
+        return { nodeId, data };
       });
-    
-      // Add new edges that don't already exist
-      data.edges.forEach(edge => {
-        if (!edge || !edge.id || !edge.source || !edge.target) {
-          console.warn("Skipping invalid edge:", edge);
-          return;
-        }
-        
-        const linkId = edge.id;
-        if (!newGraphData.links.some(l => l.id === linkId)) {
-          newGraphData.links.push({
-            id: linkId,
-            source: edge.source,
-            target: edge.target,
-            value: edge.weight || 0.5 // Default value if missing
+      
+      // Wait for all fetches to complete
+      const results = await Promise.allSettled(fetchPromises);
+      
+      // Process successful results
+      const newNodes = [];
+      const newLinks = [];
+      const newExpandedNodes = new Set(expandedNodes);
+      
+      results.forEach(result => {
+        if (result.status === 'fulfilled' && result.value) {
+          const { nodeId, data } = result.value;
+          
+          // Add this node to expanded set
+          newExpandedNodes.add(nodeId);
+          
+          // Add new nodes
+          data.nodes.forEach(node => {
+            if (!graphData.nodes.some(n => n.id === node.id) && !newNodes.some(n => n.id === node.id)) {
+              newNodes.push({
+                id: node.id,
+                path: node.path,
+                label: node.label || getImageName(node.path),
+                description: node.description || "",
+                isCenter: false,
+                level: node.level || 1
+              });
+            }
+          });
+          
+          // Add new links
+          data.edges.forEach(edge => {
+            const linkId = edge.id;
+            if (!graphData.links.some(l => l.id === linkId) && !newLinks.some(l => l.id === linkId)) {
+              newLinks.push({
+                id: linkId,
+                source: edge.source,
+                target: edge.target,
+                value: edge.weight || 0.5
+              });
+            }
           });
         }
       });
       
-      // Mark node as expanded first (before updating graph to prevent race conditions)
-      setExpandedNodes(prev => {
-        const newSet = new Set(prev);
-        newSet.add(nodeId);
-        return newSet;
-      });
-      
-      // Update graph data
-      setGraphData(newGraphData);
-      
-      // Preload images for new nodes
-      if (addedNodeIds.size > 0) {
-        console.log(`Preloading ${addedNodeIds.size} new images`);
-        Array.from(addedNodeIds).forEach(id => {
-          const node = newGraphData.nodes.find(n => n.id === id);
-          if (node && node.path) {
-            preloadImage(node.path).catch(err => console.warn(`Failed to preload ${node.path}:`, err));
+      // Update graph with all new nodes and links
+      if (newNodes.length > 0 || newLinks.length > 0) {
+        setGraphData({
+          nodes: [...graphData.nodes, ...newNodes],
+          links: [...graphData.links, ...newLinks]
+        });
+        
+        // Preload images for new nodes
+        newNodes.forEach(node => {
+          if (node.path) {
+            preloadImage(node.path).catch(() => {});
           }
         });
       }
-    
-      console.log(`Added ${addedNodeIds.size} new nodes`);
-    
+      
+      // Update expanded nodes
+      setExpandedNodes(newExpandedNodes);
+      
     } catch (error) {
-      console.error(`Error expanding node:`, error);
+      console.error(`Error in batch node expansion:`, error);
     } finally {
       setLoadingMore(false);
       
-      // Continue processing queue with a delay
+      // Continue processing queue with shorter delay
       if (loadQueue.current.length > 0) {
-        setTimeout(() => {
-          if (processingQueue.current) {
-            processLoadQueue();
-          }
-        }, 300);
+        setTimeout(processLoadQueue, 200);
       } else {
         processingQueue.current = false;
       }
@@ -291,13 +236,11 @@ const ImageSimilarityExplorer = () => {
   // Viewport change handler
   const handleViewportChange = useCallback(() => {
     if (!graphRef.current) return;
+    
     try {
       // Get current viewport information
       const zoomState = graphRef.current.zoom();
-      if (!zoomState) {
-        console.warn("No zoom state available");
-        return;
-      }
+      if (!zoomState) return;
       
       const { x, y, k } = zoomState;
       
@@ -305,24 +248,18 @@ const ImageSimilarityExplorer = () => {
       const width = window.innerWidth;
       const height = window.innerHeight;
       
-      // Calculate viewport boundaries with buffer
+      // Calculate viewport boundaries with larger buffer for more expansions
       const bounds = {
-        xMin: (0 - x) / k - 200,
-        xMax: (width - x) / k + 200,
-        yMin: (0 - y) / k - 200,
-        yMax: (height - y) / k + 200
+        xMin: (0 - x) / k - 300,
+        xMax: (width - x) / k + 300,
+        yMin: (0 - y) / k - 300,
+        yMax: (height - y) / k + 300
       };
       
       viewportBoundsRef.current = bounds;
       
-      // If auto-loading is enabled and not in extended mode, find nodes to expand
-      if (isAutoLoadingEnabled && !extendedMode && graphData.nodes.length > 0) {
-        // Check if we're already processing too many nodes
-        if (processingQueue.current && loadQueue.current.length > 5) {
-          console.log("Skipping viewport expansion - already processing queue");
-          return;
-        }
-        
+      // If auto-loading is enabled, find nodes to expand
+      if (isAutoLoadingEnabled && graphData.nodes.length > 0 && graphData.nodes.length < maxNodesLimit) {
         // Find visible nodes with valid coordinates
         const visibleNodes = graphData.nodes.filter(node => 
           node && 
@@ -331,9 +268,6 @@ const ImageSimilarityExplorer = () => {
           node.y >= bounds.yMin && node.y <= bounds.yMax
         );
         
-        // Early exit if no visible nodes
-        if (visibleNodes.length === 0) return;
-        
         // Find unexpanded visible nodes
         const unexpandedNodes = visibleNodes.filter(node => 
           node.id && 
@@ -341,8 +275,8 @@ const ImageSimilarityExplorer = () => {
           !loadQueue.current.includes(node.id)
         );
         
-        // Add to load queue (max 2 at a time to avoid overwhelming)
-        const nodesToQueue = unexpandedNodes.slice(0, 2);
+        // Add more nodes to load queue (increased from 2 to 5)
+        const nodesToQueue = unexpandedNodes.slice(0, 5);
         if (nodesToQueue.length > 0) {
           console.log(`Adding ${nodesToQueue.length} visible nodes to expansion queue`);
           const nodeIds = nodesToQueue.map(node => node.id).filter(Boolean);
@@ -357,7 +291,7 @@ const ImageSimilarityExplorer = () => {
     } catch (error) {
       console.error("Error in viewport change handler:", error);
     }
-  }, [expandedNodes, graphData.nodes, isAutoLoadingEnabled, extendedMode, processLoadQueue]);
+  }, [expandedNodes, graphData.nodes, isAutoLoadingEnabled, maxNodesLimit, processLoadQueue]);
 
 
   // Throttled version of viewport change handler to avoid too many calls
@@ -395,13 +329,9 @@ useEffect(() => {
       
       // Choose endpoint and parameters based on mode
       let url;
-      
-      // Force depth 3 for extended mode
-      const effectiveDepth = extendedMode ? 3 : neighborDepth;
-      
       if (extendedMode) {
-        url = `http://localhost:5001/extended-neighbors?image_path=${encodeURIComponent(filename)}&threshold=${similarityThreshold}&depth=${effectiveDepth}&limit_per_level=${limitPerLevel}&max_nodes=${maxNodesLimit}`;
-        console.log(`Fetching extended data for ${centerImage} with depth ${effectiveDepth}`);
+        url = `http://localhost:5001/extended-neighbors?image_path=${encodeURIComponent(filename)}&threshold=${similarityThreshold}&depth=${neighborDepth}&limit_per_level=${limitPerLevel}&max_nodes=${maxNodesLimit}`;
+        console.log(`Fetching extended data for ${centerImage} with depth ${neighborDepth}`);
       } else {
         url = `http://localhost:5001/neighbors?image_path=${encodeURIComponent(filename)}&threshold=${similarityThreshold}&limit=${neighborLimit}`;
         console.log(`Fetching direct neighbors for ${centerImage}`);
@@ -417,104 +347,98 @@ useEffect(() => {
       console.log("API response:", apiData);
       setDebugData(apiData);
       
+      // Fix: Verify we have nodes and edges before processing
+      if (!apiData.nodes || !apiData.edges) {
+        throw new Error("API response missing nodes or edges");
+      }
+      
+      console.log(`Received ${apiData.nodes.length} nodes and ${apiData.edges.length} edges from API`);
+      
       // Transform the API response to match ForceGraph expected format
-      const graphData = {
-        nodes: [],
-        links: []
-      };
-
+      const nodes = [];
+      const links = [];
+      
       // Find center node and mark as expanded
       const centerNode = apiData.nodes.find(node => node.isCenter);
       if (centerNode) {
         // Add to expanded nodes set since center is already expanded
         setExpandedNodes(new Set([centerNode.id]));
+      } else {
+        console.warn("No center node found in API response");
       }
       
       // Process all nodes from the API response
       apiData.nodes.forEach(node => {
-        graphData.nodes.push({
+        nodes.push({
           id: node.id,
           path: node.path,
           label: node.label || getImageName(node.path),
           isCenter: node.isCenter || false,
-          level: node.level || 0,
+          level: node.level !== undefined ? node.level : 0,
           description: node.description || '',
           // Pin center node in place to stop it from moving during simulation
           ...(node.isCenter ? { fx: 0, fy: 0 } : {})
         });
       });
       
+      // Create a map of node IDs for faster edge creation
+      const nodeMap = {};
+      nodes.forEach(node => {
+        nodeMap[node.id] = node;
+      });
+      
       // Process all edges from the API response
       apiData.edges.forEach(edge => {
-        graphData.links.push({
-          id: edge.id,
-          source: edge.source,
-          target: edge.target,
-          value: edge.weight
-        });
+        // Only create links if both source and target nodes exist
+        if (nodeMap[edge.source] && nodeMap[edge.target]) {
+          links.push({
+            id: edge.id,
+            source: edge.source,
+            target: edge.target,
+            value: edge.weight || 0.5
+          });
+        }
       });
 
-      console.log("Processed graph data:", graphData);
+      console.log(`Processed ${nodes.length} nodes and ${links.length} links for graph`);
       
-      // Preload images for better rendering
-      const preloadPromises = graphData.nodes.map(node => 
+      // Set the graph data with proper nodes and links
+      setGraphData({
+        nodes: nodes,
+        links: links
+      });
+      
+      // Preload images in the background
+      const preloadPromises = nodes.map(node => 
         preloadImage(node.path).catch(() => console.warn(`Failed to preload image: ${node.path}`))
       );
       
-      await Promise.allSettled(preloadPromises);
-      
-      // Set the graph data
-      setGraphData(graphData);
+      Promise.allSettled(preloadPromises).then(() => {
+        console.log("All images preloaded (or attempted)");
+      });
       
       // Adjust graph physics after setting data with better timing
       setTimeout(() => {
         if (graphRef.current) {
-          // Reset forces with better configurations
+          // Adjust forces
           if (graphRef.current.d3Force('charge')) {
-            // Adjust charge force based on node count
-            const nodeCount = graphData.nodes.length;
-            const baseStrength = extendedMode ? -500 : -300;
-            // Reduce strength for larger graphs to prevent excessive spread
-            const strength = baseStrength * (1 - Math.min(0.5, nodeCount / 200));
-            graphRef.current.d3Force('charge').strength(strength);
+            graphRef.current.d3Force('charge').strength(-300);
           }
           
           if (graphRef.current.d3Force('link')) {
-            // More dynamic link distances based on similarity
-            graphRef.current.d3Force('link').distance(link => {
-              // Stronger similarities should result in shorter distances
-              const similarityFactor = link.value || 0.5;
-              // Base distance differs by mode
-              const baseDistance = extendedMode ? 150 : 100;
-              // More similar nodes are closer together
-              return baseDistance * (1 - similarityFactor) + 30;
-            });
+            graphRef.current.d3Force('link').distance(link => 
+              Math.min(100, 100 * (1 - (link.value || 0.5)))
+            );
           }
           
-          // Add collision force for stability
-          if (graphRef.current.d3Force('collision')) {
-            graphRef.current.d3Force('collision').radius(20);
-          }
-          
-          // Strengthen center force temporarily to help layout
-          if (graphRef.current.d3Force('center')) {
-            graphRef.current.d3Force('center').strength(0.2);
-          }
-          
-          // Reheat simulation with more iterations for better initial layout
+          // Reheat simulation
           graphRef.current.d3ReheatSimulation();
           
-          // Zoom to fit with padding around the graph
-          graphRef.current.zoomToFit(800, 50);
-          
-          // Reduce center force after initial layout
-          setTimeout(() => {
-            if (graphRef.current && graphRef.current.d3Force('center')) {
-              graphRef.current.d3Force('center').strength(0.05);
-            }
-          }, 1000);
+          // Zoom to fit the graph
+          graphRef.current.zoomToFit(800, 80);
         }
-      }, 100); // Shorter initial delay
+      }, 100);
+      
     } catch (err) {
       console.error("Error fetching graph data:", err);
       setError(err.message);
@@ -795,27 +719,36 @@ return (
             onZoomEnd={throttledViewportChangeHandler}
             onNodeDragEnd={throttledViewportChangeHandler}
             nodeCanvasObject={(node, ctx, globalScale) => {
-              const label = node.label || getImageName(node.path);
-              const fontSize = 12/globalScale;
-              const nodeR = node.isCenter ? 14 : 10;
+              const nodeR = node.isCenter ? 15 : 8;
               
-              // Color based on level (for extended mode)
+              // Color based on level (for extended mode) with better colors
               let nodeColor;
               if (node.isCenter) {
-                nodeColor = '#ff6b6b';  // Red for center
+                nodeColor = '#E63946';  // Brighter red for center
               } else if (extendedMode) {
                 // Create a gradient of colors based on level
-                const levelColors = ['#4285F4', '#34A853', '#FBBC05', '#EA4335'];
-                nodeColor = levelColors[node.level % levelColors.length] || '#4285F4';
+                const levelColors = ['#4361EE', '#3A86FF', '#00BBF9', '#4CC9F0'];
+                nodeColor = levelColors[node.level % levelColors.length] || '#4361EE';
               } else {
-                nodeColor = '#4285F4';  // Default blue
+                // Better default color
+                nodeColor = '#4361EE';
               }
+              
+              // Add glow effect for better visibility
+              const shadowSize = nodeR * 1.5;
+              ctx.shadowColor = nodeColor;
+              ctx.shadowBlur = 15 * (1/globalScale);
+              ctx.shadowOffsetX = 0;
+              ctx.shadowOffsetY = 0;
               
               // Draw circle for the node
               ctx.beginPath();
               ctx.fillStyle = nodeColor;
               ctx.arc(node.x, node.y, nodeR, 0, 2 * Math.PI);
               ctx.fill();
+              
+              // Reset shadow
+              ctx.shadowBlur = 0;
               
               // Draw the image if available
               if (node.path && imagesCache.current[node.path]) {
@@ -825,7 +758,7 @@ return (
                   ctx.save();
                   // Create circular clipping path
                   ctx.beginPath();
-                  ctx.arc(node.x, node.y, nodeR, 0, 2 * Math.PI);
+                  ctx.arc(node.x, node.y, nodeR * 0.9, 0, 2 * Math.PI);
                   ctx.clip();
                   // Draw the image
                   ctx.drawImage(img, node.x - nodeR, node.y - nodeR, size, size);
@@ -846,59 +779,10 @@ return (
               // Add border to center node
               if (node.isCenter) {
                 ctx.beginPath();
-                ctx.strokeStyle = '#ff0000';
+                ctx.strokeStyle = '#ffffff';
                 ctx.lineWidth = 2 / globalScale;
-                ctx.arc(node.x, node.y, nodeR + 1, 0, 2 * Math.PI);
+                ctx.arc(node.x, node.y, nodeR + 2, 0, 2 * Math.PI);
                 ctx.stroke();
-              }
-            }}
-            cooldownTicks={100}
-            d3AlphaDecay={0.02}
-            d3VelocityDecay={0.3}
-            backgroundColor="rgba(0,0,0,0)"
-            d3Force={(force) => {
-              // Center force for graph stability
-              if (force('center')) {
-                force('center')
-                  .x(0)
-                  .y(0)
-                  .strength(extendedMode ? 0.03 : 0.05); // Lower strength in extended mode
-              }
-            
-              // Link force - adjust to make similar nodes closer
-              if (force('link')) {
-                force('link')
-                  .distance(link => {
-                    const similarity = link.value || 0.5;
-                    // Base distance depends on mode - larger for extended
-                    const baseDistance = extendedMode ? 150 : 80;
-                    // More similar nodes are closer together
-                    return baseDistance * (1 - similarity * 0.7);
-                  })
-                  .strength(link => {
-                    // Link strength proportional to similarity
-                    return 0.3 * (link.value || 0.5);
-                  });
-              }
-              
-              // Charge force for node repulsion
-              if (force('charge')) {
-                // Weaker repulsion for extended mode to keep things more compact
-                force('charge')
-                  .strength(extendedMode ? -200 : -300)
-                  .distanceMax(extendedMode ? 250 : 150);
-              }
-              
-              // Add collision force for better node spacing
-              if (!force('collision')) {
-                // Create if not exists
-                force('collision', () => {});
-              }
-              
-              if (force('collision')) {
-                force('collision')
-                  .radius(node => node.isCenter ? 20 : 12) // Center node has larger collision radius
-                  .strength(0.8); // Strong collision prevention
               }
             }}
           />

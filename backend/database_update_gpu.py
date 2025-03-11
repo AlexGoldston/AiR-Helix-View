@@ -102,7 +102,7 @@ def main():
         # Populate the graph with images
         success = populate_graph(
             IMAGES_DIR, 
-            similarity_threshold=0.7, 
+            similarity_threshold=0.35, 
             generate_descriptions=True,
             use_ml_descriptions=True,
             force_gpu=cuda_available  # Explicitly request GPU usage if available

@@ -83,6 +83,128 @@ def get_neighbors():
     
     return jsonify(filtered_data)
 
+@api_bp.route('/debug/relationships')
+def debug_relationships():
+    """Get information about relationships in the database"""
+    db = get_db_connection()
+    
+    try:
+        # Count all relationships
+        total_count = 0
+        image_path = request.args.get('image_path', 'allianz_stadium_sydney01.jpg')
+        image_count = 0
+        samples = []
+        
+        with db.driver.session() as session:
+            # Count all relationships
+            total_result = session.run("MATCH ()-[r:SIMILAR_TO]->() RETURN count(r) as count")
+            total_record = total_result.single()
+            if total_record:
+                total_count = total_record["count"]
+            
+            # Count relationships for this specific image
+            image_result = session.run(
+                """
+                MATCH (img:Image {path: $path})-[r:SIMILAR_TO]-() 
+                RETURN count(r) as count
+                """, 
+                path=image_path
+            )
+            image_record = image_result.single()
+            if image_record:
+                image_count = image_record["count"]
+            
+            # Get sample relationships
+            if image_count > 0:
+                samples_result = session.run(
+                    """
+                    MATCH (img:Image {path: $path})-[r:SIMILAR_TO]-(other:Image)
+                    RETURN img.path as source, other.path as target, r.similarity as similarity
+                    ORDER BY r.similarity DESC
+                    LIMIT 10
+                    """,
+                    path=image_path
+                )
+                
+                for record in samples_result:
+                    samples.append({
+                        "source": record["source"],
+                        "target": record["target"],
+                        "similarity": record["similarity"]
+                    })
+        
+        # Check if the image exists
+        image_exists = False
+        with db.driver.session() as session:
+            existence_result = session.run(
+                "MATCH (img:Image {path: $path}) RETURN count(img) as count",
+                path=image_path
+            )
+            existence_record = existence_result.single()
+            if existence_record and existence_record["count"] > 0:
+                image_exists = True
+        
+        return jsonify({
+            "total_relationships": total_count,
+            "image": image_path,
+            "image_exists": image_exists,
+            "relationships_for_image": image_count,
+            "samples": samples
+        })
+    except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
+        return jsonify({"error": str(e), "details": error_details}), 500
+
+@api_bp.route('/debug/threshold-test')
+def test_threshold():
+    """Test different similarity thresholds"""
+    db = get_db_connection()
+    
+    try:
+        image_path = request.args.get('image_path', 'allianz_stadium_sydney01.jpg')
+        results = {}
+        
+        # Test different thresholds
+        thresholds = [0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1, 0.05]
+        
+        with db.driver.session() as session:
+            for threshold in thresholds:
+                count_result = session.run(
+                    """
+                    MATCH (img:Image {path: $path})-[r:SIMILAR_TO]-(other:Image)
+                    WHERE r.similarity >= $threshold
+                    RETURN count(other) as count
+                    """,
+                    path=image_path,
+                    threshold=threshold
+                )
+                
+                record = count_result.single()
+                count = record["count"] if record else 0
+                results[str(threshold)] = count
+        
+        # Check if the image exists
+        image_exists = False
+        with db.driver.session() as session:
+            existence_result = session.run(
+                "MATCH (img:Image {path: $path}) RETURN count(img) as count",
+                path=image_path
+            )
+            existence_record = existence_result.single()
+            if existence_record and existence_record["count"] > 0:
+                image_exists = True
+        
+        return jsonify({
+            "image": image_path,
+            "image_exists": image_exists,
+            "threshold_counts": results
+        })
+    except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
+        return jsonify({"error": str(e), "details": error_details}), 500
+
 @api_bp.route('/extended-neighbors', methods=['GET'])
 def get_extended_neighbors():
     """Get multi-level similar image network"""
@@ -330,6 +452,37 @@ def advanced_search():
         logger.error(f"Error in advanced search: {e}")
         logger.error(traceback.format_exc())
         return jsonify({"error": f"Search failed: {str(e)}"}), 500
+
+@api_bp.route('/debug/db-status')
+def db_status():
+    """Get basic database statistics"""
+    db = get_db_connection()
+    
+    try:
+        stats = {}
+        
+        with db.driver.session() as session:
+            # Count nodes
+            node_result = session.run("MATCH (n:Image) RETURN count(n) as count")
+            node_record = node_result.single()
+            stats["image_count"] = node_record["count"] if node_record else 0
+            
+            # Count relationships
+            rel_result = session.run("MATCH ()-[r:SIMILAR_TO]->() RETURN count(r) as count")
+            rel_record = rel_result.single()
+            stats["relationship_count"] = rel_record["count"] if rel_record else 0
+            
+            # Get a few sample image paths
+            samples_result = session.run("MATCH (n:Image) RETURN n.path as path LIMIT 5")
+            stats["sample_images"] = [record["path"] for record in samples_result]
+        
+        # Add database status information
+        stats["database_status"] = "empty" if stats["image_count"] == 0 else "populated"
+        stats["needs_rebuild"] = stats["relationship_count"] == 0 and stats["image_count"] > 0
+        
+        return jsonify(stats)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 @api_bp.route('/search/tags', methods=['GET'])
 def search_by_tags():

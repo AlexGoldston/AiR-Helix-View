@@ -144,6 +144,17 @@ class Neo4jConnection:
             result = session.run("MATCH (i:Image {path: $path}) RETURN i", path=path)
             record = result.single()
             return record["i"]["path"] if record else None
+
+    def count_relationships(self):
+        """Count all relationships in the database"""
+        with self.driver.session() as session:
+            try:
+                result = session.run("MATCH ()-[r:SIMILAR_TO]->() RETURN count(r) as count")
+                record = result.single()
+                return record["count"] if record else 0
+            except Exception as e:
+                logger.error(f"Error counting relationships: {e}")
+                return 0
     
     @track_query_performance(query_type="get_neighbors")
     def get_neighbors(self, image_path, similarity_threshold, limit):
@@ -909,7 +920,31 @@ class Neo4jConnection:
                 return []
 
 def calculate_cosine_similarity(embedding1, embedding2):
-    return np.dot(embedding1, embedding2) / (np.linalg.norm(embedding1) * np.linalg.norm(embedding2))
+    """
+    Calculate cosine similarity between two embeddings
+    
+    Args:
+        embedding1: First embedding vector
+        embedding2: Second embedding vector
+    
+    Returns:
+        float: Similarity score between 0 and 1
+    """
+    try:
+        similarity = np.dot(embedding1, embedding2) / (np.linalg.norm(embedding1) * np.linalg.norm(embedding2))
+        
+        # Ensure the result is between 0 and 1
+        similarity = max(0.0, min(1.0, similarity))
+        
+        # Log high similarities for debugging
+        if similarity > 0.5:
+            logger.debug(f"High similarity found: {similarity:.4f}")
+            
+        return similarity
+    except Exception as e:
+        logger.error(f"Error calculating similarity: {e}")
+        return 0.0  # Return 0 similarity on error
+
 
 def normalize_image_path(path):
     """Extract just the filename from any path format"""
@@ -918,8 +953,6 @@ def normalize_image_path(path):
     
     # Get just the filename without any path
     return os.path.basename(path)
-
-
 
 def extract_and_store_features(image_dir, db_connection, use_ml_features=True):
         logger.info("Setting up database schema for features and tags")
@@ -975,13 +1008,13 @@ def extract_and_store_features(image_dir, db_connection, use_ml_features=True):
         logger.info(f"Feature extraction complete. Processed {processed_count} images, {successful_count} successful.")
         return successful_count
 
-def populate_graph(image_dir, similarity_threshold=0.7, generate_descriptions=True, use_ml_descriptions=True, force_gpu=False):
+def populate_graph(image_dir, similarity_threshold=0.35, generate_descriptions=True, use_ml_descriptions=True, force_gpu=False):
     """
     Populate the Neo4j graph database with image nodes and their similarities
     
     Args:
         image_dir (str): Directory containing images
-        similarity_threshold (float): Minimum similarity to create a relationship
+        similarity_threshold (float): Minimum similarity to create a relationship (lower value = more connections)
         generate_descriptions (bool): Whether to generate descriptions for images
         use_ml_descriptions (bool): Whether to use ML-based descriptions when available
         force_gpu (bool): Whether to force GPU usage for descriptions if available
@@ -1058,6 +1091,21 @@ def populate_graph(image_dir, similarity_threshold=0.7, generate_descriptions=Tr
     
     logger.info(f"Found {len(image_paths)} images to process")
     
+    # Track specific images of interest (for debugging)
+    important_images = ["allianz_stadium_sydney01.jpg", "allianz_field04.jpg"]
+    important_image_found = False
+    
+    # Check if important images exist in the directory
+    for img_path in image_paths:
+        filename = normalize_image_path(img_path)
+        if filename in important_images:
+            important_image_found = True
+            logger.info(f"Found important image: {filename}")
+    
+    if not important_image_found:
+        logger.warning(f"Could not find any of the important images: {important_images}")
+        logger.warning("This may cause issues when using these images as center nodes")
+    
     # Process and store image embeddings
     embeddings = {}
     descriptions = {}
@@ -1076,6 +1124,10 @@ def populate_graph(image_dir, similarity_threshold=0.7, generate_descriptions=Tr
             if embedding is not None:
                 embeddings[filename] = embedding
                 successful_nodes += 1
+                
+                # Log if this is an important image
+                if filename in important_images:
+                    logger.info(f"Generated embedding for important image: {filename}")
             else:
                 failed_nodes += 1
                 logger.warning(f"Failed to generate embedding for {filename}")
@@ -1183,6 +1235,10 @@ def populate_graph(image_dir, similarity_threshold=0.7, generate_descriptions=Tr
             # Get description if available
             description = descriptions.get(filename)
             db.create_image_node(filename, embedding, description)
+            
+            # Log if this is an important image
+            if filename in important_images:
+                logger.info(f"Created node for important image: {filename}")
         except Exception as e:
             logger.error(f"Failed to create node for {filename}: {e}")
 
@@ -1197,10 +1253,14 @@ def populate_graph(image_dir, similarity_threshold=0.7, generate_descriptions=Tr
         
     # Fourth pass: create similarity relationships
     relationship_count = 0
+    center_node_relationships = 0  # Counter for relationships involving important images
     filenames = list(embeddings.keys())
     
     logger.info("Creating similarity relationships...")
     for i, filename1 in enumerate(tqdm(filenames, desc="Creating relationships")):
+        # Track relationships for important center nodes
+        has_relationships = False
+        
         for filename2 in filenames[i+1:]:
             try:
                 # Calculate similarity
@@ -1209,26 +1269,41 @@ def populate_graph(image_dir, similarity_threshold=0.7, generate_descriptions=Tr
                     embeddings[filename2]
                 )
                 
+                # Log similarities involving important images
+                if filename1 in important_images or filename2 in important_images:
+                    logger.info(f"Similarity between {filename1} and {filename2}: {similarity:.4f}")
+                
                 # Create relationship if above threshold
                 if similarity >= similarity_threshold:
                     db.create_similarity_relationship(filename1, filename2, similarity)
                     relationship_count += 1
+                    
+                    # Track relationships for important images
+                    if filename1 in important_images or filename2 in important_images:
+                        center_node_relationships += 1
+                        has_relationships = True
+                        logger.info(f"Created relationship: {filename1} - {filename2} ({similarity:.4f})")
             except Exception as e:
                 logger.error(f"Error creating similarity between {filename1} and {filename2}: {e}")
         
-        # Final logging
-        logger.info("Graph population complete")
-        logger.info(f"Total nodes: {len(embeddings)}")
-        logger.info(f"Total relationships: {relationship_count}")
-        
-        # Verify database state
-        node_count = db.count_images()
-        logger.info(f"Nodes in database: {node_count}")
-        
-        # Close database connection
-        db.close()
-        
-        return True
+        # Log if an important image has no relationships
+        if filename1 in important_images and not has_relationships:
+            logger.warning(f"Important image {filename1} has no relationships with similarity threshold {similarity_threshold}")
+    
+    # Final logging
+    logger.info("Graph population complete")
+    logger.info(f"Total nodes: {len(embeddings)}")
+    logger.info(f"Total relationships: {relationship_count}")
+    logger.info(f"Relationships for important images: {center_node_relationships}")
+    
+    # Verify database state
+    node_count = db.count_images()
+    logger.info(f"Nodes in database: {node_count}")
+    
+    # Close database connection
+    db.close()
+    
+    return True
 
 if __name__ == '__main__':
     # For manual testing
