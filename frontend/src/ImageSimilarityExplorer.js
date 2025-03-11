@@ -21,7 +21,7 @@ const ImageSimilarityExplorer = () => {
   const [isAutoLoadingEnabled, setIsAutoLoadingEnabled] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [maxNodesLimit, setMaxNodesLimit] = useState(2000);
-  const [extendedMode, setExtendedMode] = useState(true);  // Enable by default
+  const [extendedMode, setExtendedMode] = useState(false);  // Enable by default
   const [neighborDepth, setNeighborDepth] = useState(3);  // Default to 3 for extended mode
   const [neighborLimit, setNeighborLimit] = useState(1000);
   const [limitPerLevel, setLimitPerLevel] = useState(100);
