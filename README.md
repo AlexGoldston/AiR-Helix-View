@@ -32,6 +32,8 @@ run ```npm start```
 ##### extended graph mode - max neighbors
 ![alt text](image-5.png)
 
+##### rectangular images in graph
+![alt text](image-7.png)
 
 ---
 

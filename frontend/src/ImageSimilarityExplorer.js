@@ -622,6 +622,35 @@ const truncateDescription = (desc, maxLength = 60) => {
     : desc;
 };
 
+// Helper function to draw fallback node
+const drawFallbackNode = (node, ctx, width, height, borderColor, globalScale) => {
+  const x = node.x - width/2;
+  const y = node.y - height/2;
+  
+  // Draw rectangle with background
+  ctx.fillStyle = node.isCenter ? '#ffeeee' : '#eeeeff';
+  ctx.fillRect(x, y, width, height);
+  
+  // Draw border
+  ctx.strokeStyle = borderColor;
+  ctx.lineWidth = node.isCenter ? 3 * (1/globalScale) : 2 * (1/globalScale);
+  ctx.strokeRect(x, y, width, height);
+  
+  // Add text label
+  const label = getImageName(node.path).charAt(0).toUpperCase();
+  ctx.font = `${node.isCenter ? 16 : 12}px Sans-Serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = '#333333';
+  ctx.fillText(label, node.x, node.y);
+  
+  // Reset shadow
+  ctx.shadowColor = 'transparent';
+  ctx.shadowBlur = 0;
+  ctx.shadowOffsetX = 0;
+  ctx.shadowOffsetY = 0;
+};
+
 return (
   <div className="relative flex flex-col h-screen w-full overflow-hidden">
     {/* Animated Background */}
@@ -719,70 +748,96 @@ return (
             onZoomEnd={throttledViewportChangeHandler}
             onNodeDragEnd={throttledViewportChangeHandler}
             nodeCanvasObject={(node, ctx, globalScale) => {
-              const nodeR = node.isCenter ? 15 : 8;
+              // Define base dimensions for rectangular nodes
+              const baseWidth = 40;  // Base width for images
+              const baseHeight = 30; // Base height for images
               
-              // Color based on level (for extended mode) with better colors
-              let nodeColor;
+              // Make center node larger
+              const scaleFactor = node.isCenter ? 1.5 : 1.0;
+              const width = baseWidth * scaleFactor;
+              const height = baseHeight * scaleFactor;
+              
+              // Add drop shadow for better visibility
+              ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+              ctx.shadowBlur = 5 * (1/globalScale);
+              ctx.shadowOffsetX = 2 * (1/globalScale);
+              ctx.shadowOffsetY = 2 * (1/globalScale);
+              
+              // Color based on level (for extended mode)
+              let borderColor;
               if (node.isCenter) {
-                nodeColor = '#E63946';  // Brighter red for center
+                borderColor = '#E63946';  // Red for center
               } else if (extendedMode) {
-                // Create a gradient of colors based on level
+                // Level-based colors
                 const levelColors = ['#4361EE', '#3A86FF', '#00BBF9', '#4CC9F0'];
-                nodeColor = levelColors[node.level % levelColors.length] || '#4361EE';
+                borderColor = levelColors[node.level % levelColors.length] || '#4361EE';
               } else {
-                // Better default color
-                nodeColor = '#4361EE';
+                borderColor = '#4361EE';  // Default blue
               }
-              
-              // Add glow effect for better visibility
-              const shadowSize = nodeR * 1.5;
-              ctx.shadowColor = nodeColor;
-              ctx.shadowBlur = 15 * (1/globalScale);
-              ctx.shadowOffsetX = 0;
-              ctx.shadowOffsetY = 0;
-              
-              // Draw circle for the node
-              ctx.beginPath();
-              ctx.fillStyle = nodeColor;
-              ctx.arc(node.x, node.y, nodeR, 0, 2 * Math.PI);
-              ctx.fill();
-              
-              // Reset shadow
-              ctx.shadowBlur = 0;
               
               // Draw the image if available
               if (node.path && imagesCache.current[node.path]) {
                 try {
                   const img = imagesCache.current[node.path];
-                  const size = nodeR * 2;
-                  ctx.save();
-                  // Create circular clipping path
-                  ctx.beginPath();
-                  ctx.arc(node.x, node.y, nodeR * 0.9, 0, 2 * Math.PI);
-                  ctx.clip();
+                  const x = node.x - width/2;
+                  const y = node.y - height/2;
+                  
+                  // Draw the image (preserving aspect ratio)
+                  const imgRatio = img.width / img.height;
+                  let drawWidth = width;
+                  let drawHeight = height;
+                  
+                  // Adjust dimensions to preserve aspect ratio
+                  if (imgRatio > width/height) {
+                    // Image is wider than our box
+                    drawHeight = width / imgRatio;
+                  } else {
+                    // Image is taller than our box
+                    drawWidth = height * imgRatio;
+                  }
+                  
+                  // Center the image in the allocated space
+                  const drawX = node.x - drawWidth/2;
+                  const drawY = node.y - drawHeight/2;
+                  
+                  // Draw white background for transparent images
+                  ctx.fillStyle = '#ffffff';
+                  ctx.fillRect(drawX, drawY, drawWidth, drawHeight);
+                  
                   // Draw the image
-                  ctx.drawImage(img, node.x - nodeR, node.y - nodeR, size, size);
-                  ctx.restore();
+                  ctx.drawImage(img, drawX, drawY, drawWidth, drawHeight);
+                  
+                  // Draw a border
+                  ctx.strokeStyle = borderColor;
+                  ctx.lineWidth = node.isCenter ? 3 * (1/globalScale) : 2 * (1/globalScale);
+                  ctx.strokeRect(drawX, drawY, drawWidth, drawHeight);
+                  
+                  // Reset shadow
+                  ctx.shadowColor = 'transparent';
+                  ctx.shadowBlur = 0;
+                  ctx.shadowOffsetX = 0;
+                  ctx.shadowOffsetY = 0;
+                  
+                  // For center node, add a highlight indicator
+                  if (node.isCenter) {
+                    ctx.strokeStyle = '#ffffff';
+                    ctx.lineWidth = 1 * (1/globalScale);
+                    ctx.strokeRect(
+                      drawX - 3 * (1/globalScale), 
+                      drawY - 3 * (1/globalScale), 
+                      drawWidth + 6 * (1/globalScale), 
+                      drawHeight + 6 * (1/globalScale)
+                    );
+                  }
                 } catch (err) {
                   console.error(`Error rendering image for node ${node.id}:`, err);
+                  
+                  // Fallback: draw a colored rectangle with text
+                  drawFallbackNode(node, ctx, width, height, borderColor, globalScale);
                 }
               } else {
-                // Fallback - render a node with the first letter of filename
-                const letter = getImageName(node.path).charAt(0).toUpperCase();
-                ctx.font = `${nodeR}px Sans-Serif`;
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                ctx.fillStyle = 'white';
-                ctx.fillText(letter, node.x, node.y);
-              }
-              
-              // Add border to center node
-              if (node.isCenter) {
-                ctx.beginPath();
-                ctx.strokeStyle = '#ffffff';
-                ctx.lineWidth = 2 / globalScale;
-                ctx.arc(node.x, node.y, nodeR + 2, 0, 2 * Math.PI);
-                ctx.stroke();
+                // If image is not available, draw a colored rectangle with text
+                drawFallbackNode(node, ctx, width, height, borderColor, globalScale);
               }
             }}
           />
