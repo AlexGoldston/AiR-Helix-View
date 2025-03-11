@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import ForceGraph2D from 'react-force-graph-2d';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './components/ui/dialog';
-import { Info, ZoomIn, ZoomOut, Download, X } from 'lucide-react';
+import { Info, ZoomIn, ZoomOut, Download, X, Filter } from 'lucide-react';
 import { Button } from './components/ui/button';
 import { Slider } from './components/ui/slider';
 import TagFilter from './components/TagFilter';
