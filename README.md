@@ -32,6 +32,12 @@ run ```npm start```
 ##### extended graph mode - max neighbors
 ![alt text](image-5.png)
 
+#### switch between Circular and Rectangular render mode for nodes
+**circular mode** TODO:fix image distortion
+![alt text](image-10.png)
+**rectangular mode**
+![alt text](image-11.png)
+
 
 ---
 
