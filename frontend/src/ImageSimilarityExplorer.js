@@ -12,20 +12,20 @@ const ImageSimilarityExplorer = () => {
   const [centerImage, setCenterImage] = useState('arrowhead_stadium29.jpg');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [similarityThreshold, setSimilarityThreshold] = useState(0.65);
+  const [similarityThreshold, setSimilarityThreshold] = useState(0.75);
   const [debugData, setDebugData] = useState(null);
-  const [showDebugPanel, setShowDebugPanel] = useState(false);
+  const [showDebugPanel, setShowDebugPanel] = useState(true);
   const [openModal, setOpenModal] = useState(false);
   const [selectedNode, setSelectedNode] = useState(null);
   const [expandedNodes, setExpandedNodes] = useState(new Set());
   const [isAutoLoadingEnabled, setIsAutoLoadingEnabled] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [maxNodesLimit, setMaxNodesLimit] = useState(2000);
+  const [maxNodesLimit, setMaxNodesLimit] = useState(1000);
   const [extendedMode, setExtendedMode] = useState(false);  // Enable by default
   const [neighborDepth, setNeighborDepth] = useState(3);  // Default to 3 for extended mode
   const [neighborLimit, setNeighborLimit] = useState(1000);
-  const [limitPerLevel, setLimitPerLevel] = useState(100);
-  const [showControls, setShowControls] = useState(false);
+  const [limitPerLevel, setLimitPerLevel] = useState(40);
+  const [showControls, setShowControls] = useState(true);
   
   // Refs
   const imagesCache = useRef({});
