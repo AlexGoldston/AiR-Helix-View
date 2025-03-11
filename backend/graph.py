@@ -182,7 +182,7 @@ class Neo4jConnection:
                 # First find the center node
                 center_node_query = """
                 MATCH (center:Image {path: $image_path})
-                RETURN id(center) as id, center.path as path, center.description as description
+                RETURN elementId(center) as id, center.path as path, center.description as description
                 """
                 
                 center_node_result = session.run(center_node_query, image_path=image_path)
@@ -210,7 +210,7 @@ class Neo4jConnection:
                 MATCH (center:Image {path: $image_path})-[r:SIMILAR_TO]-(neighbor:Image)
                 WHERE r.similarity >= $threshold
                 RETURN 
-                    id(neighbor) as id, 
+                    elemendId(neighbor) as id, 
                     neighbor.path as path,
                     neighbor.description as description,
                     r.similarity as similarity
@@ -300,7 +300,7 @@ class Neo4jConnection:
                     # Find node in database
                     node_query = """
                     MATCH (node:Image {path: $path})
-                    RETURN id(node) as id, node.path as path, node.description as description
+                    RETURN elementId(node) as id, node.path as path, node.description as description
                     """
                     
                     node_result = session.run(node_query, path=current_path)
@@ -337,7 +337,7 @@ class Neo4jConnection:
                     MATCH (current:Image {path: $path})-[r:SIMILAR_TO]-(neighbor:Image)
                     WHERE r.similarity >= $threshold
                     RETURN 
-                        id(neighbor) as id, 
+                        elemendId(neighbor) as id, 
                         neighbor.path as path,
                         neighbor.description as description,
                         r.similarity as similarity
