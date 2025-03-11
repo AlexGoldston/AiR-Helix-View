@@ -4,6 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Info, ZoomIn, ZoomOut, Download, X } from 'lucide-react';
 import { Button } from './components/ui/button';
 import { Slider } from './components/ui/slider';
+import TagFilter from './components/TagFilter';
 import _ from 'lodash';
 
 const ImageSimilarityExplorer = () => {
@@ -27,7 +28,10 @@ const ImageSimilarityExplorer = () => {
   const [limitPerLevel, setLimitPerLevel] = useState(40);
   const [showControls, setShowControls] = useState(true);
   const [nodeStyle, setNodeStyle] = useState('circular'); // or 'rectangular'
-  
+  const [filteredNodes, setFilteredNodes] = useState(new Set());
+  const [isFiltering, setIsFiltering] = useState(false);
+  const [filterTags, setFilterTags] = useState([]);
+    
   // Refs
   const imagesCache = useRef({});
   const graphRef = useRef(null);
@@ -60,7 +64,7 @@ const ImageSimilarityExplorer = () => {
     return cleanPath(path);
   }, []);
   
-  // Add this helper function for constructing image URLs consistently
+  // helper function for constructing image URLs consistently
   const getImageUrl = useCallback((path) => {
     if (!path) return null;
     
@@ -68,8 +72,7 @@ const ImageSimilarityExplorer = () => {
     return `http://localhost:5001/static/${encodeURIComponent(filename)}`;
   }, [getImageName]);
   
-  // Then use getImageUrl() throughout your component instead of constructing URLs manually
-  // For example, in your preloadImage function:
+  // image preloading function
   const preloadImage = useCallback((path) => {
     return new Promise((resolve, reject) => {
       if (!path) {
@@ -107,7 +110,7 @@ const ImageSimilarityExplorer = () => {
     });
   }, [getImageUrl]);
 
-  // updated loading queue function
+  // loading queue function
   const processLoadQueue = useCallback(async () => {
     if (loadQueue.current.length === 0) {
       processingQueue.current = false;
@@ -234,7 +237,7 @@ const ImageSimilarityExplorer = () => {
     }
   }, [graphData, expandedNodes, getImageName, maxNodesLimit, neighborLimit, preloadImage, similarityThreshold]);
 
-  // Viewport change handler
+  // viewport change handler
   const handleViewportChange = useCallback(() => {
     if (!graphRef.current) return;
     
@@ -295,13 +298,13 @@ const ImageSimilarityExplorer = () => {
   }, [expandedNodes, graphData.nodes, isAutoLoadingEnabled, maxNodesLimit, processLoadQueue]);
 
 
-  // Throttled version of viewport change handler to avoid too many calls
+  // throttled version of viewport change handler to avoid too many calls
   const throttledViewportChangeHandler = useCallback(
     _.debounce(handleViewportChange, 300),
   [handleViewportChange]
 );
 
-// When loading, check localStorage
+// when loading, check localStorage for nodestyle state
 useEffect(() => {
   const savedStyle = localStorage.getItem('nodeStyle');
   if (savedStyle) {
@@ -309,12 +312,12 @@ useEffect(() => {
   }
 }, []);
 
-// Update localStorage when the style changes
+// update localStorage when the nodestyle changes
 useEffect(() => {
   localStorage.setItem('nodeStyle', nodeStyle);
 }, [nodeStyle]);
 
-// ensure depth is set to 3 in extended mode by default
+// ensure depth is set to 3 in extended mode by default -- TODO: comment out later for testing
 useEffect(() => {
   if (extendedMode) {
     setNeighborDepth(3);
@@ -464,7 +467,7 @@ useEffect(() => {
   fetchData();
 }, [centerImage, similarityThreshold, neighborLimit, extendedMode, neighborDepth, limitPerLevel, maxNodesLimit, getImageName, preloadImage]);
 
-// Effect to calculate initial viewport
+// calculate initial viewport
 useEffect(() => {
   if (graphRef.current) {
     // Initial viewport calculation
@@ -472,7 +475,7 @@ useEffect(() => {
   }
 }, [graphData, throttledViewportChangeHandler]);
 
-// Effect to process queue when auto-loading changes
+// process queue when auto-loading changes
 useEffect(() => {
   if (isAutoLoadingEnabled && loadQueue.current.length > 0 && !processingQueue.current) {
     processLoadQueue();
@@ -665,6 +668,76 @@ const drawFallbackNode = (node, ctx, width, height, borderColor, globalScale) =>
   ctx.shadowOffsetY = 0;
 };
 
+// filter using tags
+useEffect(() => {
+  if (!filterTags.length) {
+    // If no filter tags, clear filtering
+    setFilteredNodes(new Set());
+    setIsFiltering(false);
+    return;
+  }
+  
+  // Set filtering flag
+  setIsFiltering(true);
+  
+  // Fetch nodes that match the filter tags
+  const fetchFilteredNodes = async () => {
+    try {
+      // Construct tag parameter
+      const tagsParam = filterTags.join(',');
+      
+      // Make API request
+      const response = await fetch(
+        `http://localhost:5001/search/tags?tags=${encodeURIComponent(tagsParam)}&operator=OR&limit=100`
+      );
+      
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      // Create a set of paths that match the filters
+      const filteredPaths = new Set(data.results.map(item => item.path));
+      
+      // Now filter nodes based on these paths
+      const matchingNodeIds = new Set();
+      
+      // Always include center node
+      const centerNode = graphData.nodes.find(n => n.isCenter);
+      if (centerNode) {
+        matchingNodeIds.add(centerNode.id);
+      }
+      
+      // Add nodes that match filtered paths
+      graphData.nodes.forEach(node => {
+        if (filteredPaths.has(node.path)) {
+          matchingNodeIds.add(node.id);
+        }
+      });
+      
+      // Update filtered nodes set
+      setFilteredNodes(matchingNodeIds);
+      
+    } catch (error) {
+      console.error('Error filtering nodes by tags:', error);
+    }
+  };
+  
+  fetchFilteredNodes();
+  
+}, [filterTags, graphData.nodes]);
+
+// tag filter apply handler
+const handleApplyFilters = (selectedTags) => {
+  setFilterTags(selectedTags);
+};
+
+// tag filter clear handler
+const handleClearFilters = () => {
+  setFilterTags([]);
+};
+
 return (
   <div className="relative flex flex-col h-screen w-full overflow-hidden">
     {/* Animated Background */}
@@ -714,6 +787,12 @@ return (
       <h1 className="text-xl font-bold bg-gradient-to-r from-blue-500 to-teal-400 bg-clip-text text-transparent">
         AiR-Helix-View
       </h1>
+      
+      {/* Tag Filter Button */}
+      <TagFilter 
+        onApplyFilters={handleApplyFilters}
+        onClearFilters={handleClearFilters}
+      />
     </div>
 
     {/* Main Content */}
@@ -756,12 +835,28 @@ return (
             }}
             nodeColor={node => node.isCenter ? '#ff6b6b' : '#4285F4'}
             linkWidth={link => (link.value || 0.1) * 5}
-            linkColor={() => 'rgba(120, 120, 120, 0.15)'}
+            linkColor={(link) => {
+              // If filtering is active, only show links between filtered nodes
+              if (isFiltering) {
+                const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
+                const targetId = typeof link.target === 'object' ? link.target.id : link.target;
+                
+                if (!filteredNodes.has(sourceId) || !filteredNodes.has(targetId)) {
+                  return 'rgba(0, 0, 0, 0)'; // Hide links that connect to filtered-out nodes
+                }
+              }
+              
+              return 'rgba(120, 120, 120, 0.15)'; // Default link color
+            }}
             linkOpacity={0.2}
             onNodeClick={handleNodeClick}
             onZoomEnd={throttledViewportChangeHandler}
             onNodeDragEnd={throttledViewportChangeHandler}
             nodeCanvasObject={(node, ctx, globalScale) => {
+              if (isFiltering && !filteredNodes.has(node.id)) {
+                return;
+              }
+
               if (nodeStyle === 'circular') {
                 // Original circular node drawing code
                 const nodeR = node.isCenter ? 15 : 8;
@@ -828,12 +923,9 @@ return (
                   ctx.stroke();
                 }
               } else {
-                // Rectangular node drawing code (what we just implemented)
+                // Rectangular node drawing code
                 const baseWidth = 40;
                 const baseHeight = 30;
-                
-                // Rest of the rectangular node code...
-                // [your existing rectangular node drawing code here]
                 
                 // Make center node larger
                 const scaleFactor = node.isCenter ? 1.5 : 1.0;
@@ -862,7 +954,6 @@ return (
                 if (node.path && imagesCache.current[node.path]) {
                   try {
                     const img = imagesCache.current[node.path];
-                    // [rest of your rectangular image drawing code]
                     const x = node.x - width/2;
                     const y = node.y - height/2;
                     
@@ -949,6 +1040,24 @@ return (
                 <span className="w-3 h-3 bg-[#FBBC05] rounded-full mr-1"></span>
                 Level 3
               </span>
+            </div>
+          </div>
+        )}
+
+        {/* Tag Filtering Status Indicator */}
+        {isFiltering && (
+          <div className="absolute top-16 left-4 bg-blue-900/80 backdrop-blur-sm p-2 rounded shadow-lg z-20">
+            <div className="flex items-center text-sm">
+              <Filter className="h-4 w-4 mr-1" />
+              <span>Filtering: {filteredNodes.size} nodes match</span>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="ml-2 h-6 w-6 p-0" 
+                onClick={handleClearFilters}
+              >
+                <X className="h-4 w-4" />
+              </Button>
             </div>
           </div>
         )}
@@ -1271,7 +1380,6 @@ return (
                       <p><span className="text-gray-400">Node ID:</span> {selectedNode.id}</p>
                       <p><span className="text-gray-400">Type:</span> {selectedNode.isCenter ? 'Center Image' : 'Similar Image'}</p>
                       
-                      {/* Add description display here */}
                       {selectedNode.description && (
                         <div>
                           <p className="text-gray-400 mb-1">Description:</p>
@@ -1320,5 +1428,4 @@ return (
     </div>
   );
 };
-
 export default ImageSimilarityExplorer;
