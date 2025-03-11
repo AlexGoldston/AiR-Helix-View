@@ -210,7 +210,7 @@ class Neo4jConnection:
                 MATCH (center:Image {path: $image_path})-[r:SIMILAR_TO]-(neighbor:Image)
                 WHERE r.similarity >= $threshold
                 RETURN 
-                    elemendId(neighbor) as id, 
+                    elementId(neighbor) as id, 
                     neighbor.path as path,
                     neighbor.description as description,
                     r.similarity as similarity

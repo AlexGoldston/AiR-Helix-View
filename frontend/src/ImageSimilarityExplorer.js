@@ -9,10 +9,10 @@ import _ from 'lodash';
 const ImageSimilarityExplorer = () => {
   // State management
   const [graphData, setGraphData] = useState({ nodes: [], links: [] });
-  const [centerImage, setCenterImage] = useState('allianz_stadium_sydney01.jpg');
+  const [centerImage, setCenterImage] = useState('arrowhead_stadium29.jpg');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [similarityThreshold, setSimilarityThreshold] = useState(0.35);
+  const [similarityThreshold, setSimilarityThreshold] = useState(0.65);
   const [debugData, setDebugData] = useState(null);
   const [showDebugPanel, setShowDebugPanel] = useState(false);
   const [openModal, setOpenModal] = useState(false);
@@ -23,8 +23,8 @@ const ImageSimilarityExplorer = () => {
   const [maxNodesLimit, setMaxNodesLimit] = useState(1000);
   const [extendedMode, setExtendedMode] = useState(true);  // Enable by default
   const [neighborDepth, setNeighborDepth] = useState(3);  // Default to 3 for extended mode
-  const [neighborLimit, setNeighborLimit] = useState(200);
-  const [limitPerLevel, setLimitPerLevel] = useState(20);
+  const [neighborLimit, setNeighborLimit] = useState(100);
+  const [limitPerLevel, setLimitPerLevel] = useState(10);
   const [showControls, setShowControls] = useState(false);
   
   // Refs
