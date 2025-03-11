@@ -28,6 +28,9 @@ run ```npm start```
 **rectangular mode**
 ![alt text](image-11.png)
 
+#### TAG filtering implemented
+![alt text](image.png)
+
 
 ---
 
