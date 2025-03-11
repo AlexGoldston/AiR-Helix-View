@@ -1,10 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import ForceGraph2D from 'react-force-graph-2d';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './components/ui/dialog';
-import { Info, ZoomIn, ZoomOut, Download } from 'lucide-react';
+import { Info, ZoomIn, ZoomOut, Download, X } from 'lucide-react';
 import { Button } from './components/ui/button';
-import GraphControls from './components/GraphControls';
-import SimpleNavBar from './components/SimpleNavBar';
+import { Slider } from './components/ui/slider';
 import _ from 'lodash';
 
 const ImageSimilarityExplorer = () => {
@@ -16,6 +15,7 @@ const ImageSimilarityExplorer = () => {
   const [similarityThreshold, setSimilarityThreshold] = useState(0.63);
   const [neighborLimit, setNeighborLimit] = useState(20);
   const [debugData, setDebugData] = useState(null);
+  const [showDebugPanel, setShowDebugPanel] = useState(false);
   const [openModal, setOpenModal] = useState(false);
   const [selectedNode, setSelectedNode] = useState(null);
   const [expandedNodes, setExpandedNodes] = useState(new Set());
@@ -23,8 +23,9 @@ const ImageSimilarityExplorer = () => {
   const [loadingMore, setLoadingMore] = useState(false);
   const [maxNodesLimit, setMaxNodesLimit] = useState(200);
   const [extendedMode, setExtendedMode] = useState(true);  // Enable by default
-  const [neighborDepth, setNeighborDepth] = useState(2);
+  const [neighborDepth, setNeighborDepth] = useState(3);  // Default to 3 for extended mode
   const [limitPerLevel, setLimitPerLevel] = useState(10);
+  const [showControls, setShowControls] = useState(false);
   
   // Refs
   const imagesCache = useRef({});
@@ -68,7 +69,6 @@ const ImageSimilarityExplorer = () => {
   
   // Then use getImageUrl() throughout your component instead of constructing URLs manually
   // For example, in your preloadImage function:
-  
   const preloadImage = useCallback((path) => {
     return new Promise((resolve, reject) => {
       if (!path) {
@@ -678,6 +678,26 @@ const toggleAutomaticLoading = useCallback(() => {
   setIsAutoLoadingEnabled(prev => !prev);
 }, []);
 
+// Get a short description from the center node
+const getCenterNodeDescription = useCallback(() => {
+  const centerNode = graphData.nodes.find(node => node.isCenter);
+  if (centerNode && centerNode.description) {
+    const maxLength = 100;
+    return centerNode.description.length > maxLength ? 
+      `${centerNode.description.substring(0, maxLength)}...` : 
+      centerNode.description;
+  }
+  return "No description available";
+}, [graphData.nodes]);
+
+// Add a function to truncate descriptions
+const truncateDescription = (desc, maxLength = 60) => {
+  if (!desc) return 'No description available';
+  return desc.length > maxLength 
+    ? `${desc.substring(0, maxLength)}...` 
+    : desc;
+};
+
 return (
   <div className="relative flex flex-col h-screen w-full overflow-hidden">
     {/* Animated Background */}
@@ -721,26 +741,13 @@ return (
         </g>
       </svg>
     </div>
-    
-    <SimpleNavBar 
-      centerImage={centerImage}
-      getImageName={getImageName}
-      similarityThreshold={similarityThreshold}
-      setSimilarityThreshold={setSimilarityThreshold}
-      neighborLimit={neighborLimit}
-      setNeighborLimit={setNeighborLimit}
-      extendedMode={extendedMode}
-      setExtendedMode={setExtendedMode}
-      neighborDepth={neighborDepth}
-      setNeighborDepth={setNeighborDepth}
-      limitPerLevel={limitPerLevel}
-      setLimitPerLevel={setLimitPerLevel}
-      setDebugData={setDebugData}
-      debugData={debugData}
-      handleResetZoom={handleResetZoom}
-      handleZoomIn={handleZoomIn}
-      handleZoomOut={handleZoomOut}
-    />
+
+    {/* Simple Title Banner */}
+    <div className="z-10 flex items-center justify-between p-4 bg-gray-950/80 backdrop-blur-sm border-b border-gray-800">
+      <h1 className="text-xl font-bold bg-gradient-to-r from-blue-500 to-teal-400 bg-clip-text text-transparent">
+        AiR-Helix-View
+      </h1>
+    </div>
 
     {/* Main Content */}
     <div className="flex-1 relative z-10">
@@ -896,6 +903,8 @@ return (
             }}
           />
         )}
+        
+        {/* Level indicator legend - always shown */}
         {extendedMode && (
           <div className="absolute bottom-20 left-4 bg-gray-900/80 backdrop-blur-sm p-2 rounded-lg shadow-lg border border-gray-800 z-20">
             <div className="text-xs text-gray-400 mb-1">Network Levels:</div>
@@ -921,51 +930,264 @@ return (
         )}
       </div>
 
-      {/* Debug Panel */}
-      {debugData && (
-        <div className="absolute top-16 right-4 w-80 bg-gray-900/90 backdrop-blur-sm p-4 rounded-lg shadow-lg border border-gray-800 max-h-[80vh] overflow-auto z-20">
-          <h3 className="text-lg font-medium text-blue-400 mb-2">API Response</h3>
-          <div className="text-sm">
-            <div className="mb-1">Nodes: {debugData.nodes?.length || 0}</div>
-            <div className="mb-1">Edges: {debugData.edges?.length || 0}</div>
-            
-            {debugData.nodes?.length > 0 && (
-              <div className="mt-4">
-                <h4 className="text-green-400 mb-1">Sample Node:</h4>
-                <pre className="bg-gray-800 p-2 rounded text-xs overflow-x-auto">
-                  {JSON.stringify(debugData.nodes[0], null, 2)}
-                </pre>
-                {debugData.nodes[0].description && (
-                  <div className="mt-2">
-                    <h4 className="text-green-400 mb-1">Node Description:</h4>
-                    <div className="bg-gray-800 p-2 rounded text-xs">
-                      {debugData.nodes[0].description}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-            
-            {debugData.edges?.length > 0 && (
-              <div className="mt-4">
-                <h4 className="text-green-400 mb-1">Sample Edge:</h4>
-                <pre className="bg-gray-800 p-2 rounded text-xs overflow-x-auto">
-                  {JSON.stringify(debugData.edges[0], null, 2)}
-                </pre>
-              </div>
-            )}
+      {/* Consolidated Control Panel */}
+      <div className="absolute bottom-4 right-4 z-10">
+        <div className={`bg-gray-900/90 backdrop-blur-sm p-4 rounded-lg shadow-lg border border-gray-800 mb-2 transition-all duration-300 ${showControls ? 'w-80' : 'w-auto'}`}>
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-sm font-medium">Graph Controls</h3>
+            <button 
+              onClick={() => setShowControls(!showControls)}
+              className="text-gray-400 hover:text-white"
+            >
+              {showControls ? <X size={16} /> : null}
+            </button>
           </div>
           
-          <Button 
-            variant="outline" 
-            size="sm"
-            onClick={() => setDebugData(null)}
-            className="mt-4 w-full"
-          >
-            Close Debug Panel
-          </Button>
+          {showControls && (
+            <div className="space-y-4">
+              {/* Current Image */}
+              <div>
+                <h4 className="text-sm font-medium mb-2">Current Center Image</h4>
+                <div className="bg-gray-950 p-2 rounded-lg mb-2">
+                  <img 
+                    src={`http://localhost:5001/static/${getImageName(centerImage)}`}
+                    alt={getImageName(centerImage)}
+                    className="w-full h-32 object-contain rounded-md border border-gray-800"
+                    onError={(e) => {
+                      e.target.onerror = null;
+                      e.target.src = "/api/placeholder/200/120";
+                    }}
+                  />
+                  <p className="mt-2 text-xs text-gray-400 text-center truncate">{getImageName(centerImage)}</p>
+                </div>
+                
+                {/* Description */}
+                <div className="text-xs text-gray-300 p-2 bg-gray-800/60 rounded-lg">
+                  <span className="text-gray-400 block mb-1">Description:</span>
+                  {truncateDescription(getCenterNodeDescription(), 100)}
+                </div>
+              </div>
+              
+              {/* Similarity Threshold */}
+              <div>
+                <label className="text-xs text-gray-400 mb-1 block">
+                  Similarity Threshold: {similarityThreshold.toFixed(2)}
+                </label>
+                <Slider 
+                  defaultValue={[similarityThreshold]} 
+                  min={0.5} 
+                  max={0.95} 
+                  step={0.01}
+                  onValueChange={(values) => setSimilarityThreshold(values[0])}
+                  className="w-full"
+                />
+                <p className="text-xs text-gray-500 mt-1">Higher values show more similar images</p>
+              </div>
+              
+              {/* Neighbor Limit */}
+              <div>
+                <label className="text-xs text-gray-400 mb-1 block">
+                  Max Neighbors: {neighborLimit}
+                </label>
+                <Slider 
+                  defaultValue={[neighborLimit]} 
+                  min={5} 
+                  max={50} 
+                  step={5}
+                  onValueChange={(values) => setNeighborLimit(values[0])}
+                  className="w-full"
+                />
+              </div>
+              
+              {/* Max Nodes Limit */}
+              <div>
+                <label className="text-xs text-gray-400 mb-1 block">
+                  Max Nodes: {maxNodesLimit}
+                </label>
+                <Slider 
+                  defaultValue={[maxNodesLimit]} 
+                  min={50} 
+                  max={500} 
+                  step={50}
+                  onValueChange={(values) => setMaxNodesLimit(values[0])}
+                  className="w-full"
+                />
+              </div>
+              
+              {/* Extended Mode Toggle */}
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  id="extendedMode"
+                  checked={extendedMode}
+                  onChange={() => setExtendedMode(!extendedMode)}
+                  className="mr-2 h-4 w-4"
+                />
+                <label htmlFor="extendedMode" className="text-xs text-gray-400">
+                  Extended Graph View
+                </label>
+              </div>
+              
+              {/* Extended Mode Options */}
+              {extendedMode && (
+                <>
+                  <div>
+                    <label className="text-xs text-gray-400 mb-1 block">
+                      Network Depth: {neighborDepth}
+                    </label>
+                    <Slider 
+                      value={[neighborDepth]} 
+                      min={1} 
+                      max={3} 
+                      step={1}
+                      disabled={true} // Always 3 for extended mode
+                      className="w-full opacity-70"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Fixed at 3 for extended mode
+                    </p>
+                  </div>
+                  
+                  <div>
+                    <label className="text-xs text-gray-400 mb-1 block">
+                      Nodes Per Level: {limitPerLevel}
+                    </label>
+                    <Slider 
+                      defaultValue={[limitPerLevel]} 
+                      min={5} 
+                      max={20} 
+                      step={5}
+                      onValueChange={(values) => setLimitPerLevel(values[0])}
+                      className="w-full"
+                    />
+                  </div>
+                </>
+              )}
+              
+              {/* Auto-loading Toggle */}
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  id="autoLoading"
+                  checked={isAutoLoadingEnabled}
+                  onChange={toggleAutomaticLoading}
+                  className="mr-2 h-4 w-4"
+                />
+                <label htmlFor="autoLoading" className="text-xs text-gray-400">
+                  Automatic Node Expansion
+                </label>
+              </div>
+              
+              {/* Stats */}
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div className="bg-gray-800 p-2 rounded-md">
+                  <span className="text-gray-400 block">Nodes:</span>
+                  <span className="font-medium">{graphData.nodes.length}</span>
+                </div>
+                <div className="bg-gray-800 p-2 rounded-md">
+                  <span className="text-gray-400 block">Expanded:</span>
+                  <span className="font-medium">{expandedNodes.size}</span>
+                </div>
+              </div>
+              
+              {/* Actions */}
+              <div className="grid grid-cols-2 gap-2">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={clearGraph}
+                  className="text-xs"
+                >
+                  Clear Graph
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={resetView}
+                  className="text-xs"
+                >
+                  Reset View
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={handleZoomIn}
+                  className="text-xs flex items-center justify-center"
+                >
+                  <ZoomIn className="h-3 w-3 mr-1" /> Zoom In
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={handleZoomOut}
+                  className="text-xs flex items-center justify-center"
+                >
+                  <ZoomOut className="h-3 w-3 mr-1" /> Zoom Out
+                </Button>
+              </div>
+              
+              {/* Debug Toggle */}
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => setShowDebugPanel(!showDebugPanel)}
+                className="w-full text-xs"
+              >
+                {showDebugPanel ? 'Hide Debug Info' : 'Show Debug Info'}
+              </Button>
+              
+              {/* Debug Panel */}
+              {showDebugPanel && debugData && (
+                <div className="mt-2 border-t border-gray-700 pt-2 text-xs">
+                  <h4 className="font-medium text-blue-400 mb-1">API Response</h4>
+                  <div>
+                    <div className="mb-1">Nodes: {debugData.nodes?.length || 0}</div>
+                    <div className="mb-1">Edges: {debugData.edges?.length || 0}</div>
+                    
+                    {debugData.nodes?.length > 0 && (
+                      <div className="mt-2">
+                        <div className="text-green-400 mb-1">Sample Node:</div>
+                        <pre className="bg-gray-800 p-2 rounded text-xs overflow-x-auto">
+                          {JSON.stringify(debugData.nodes[0], null, 2)}
+                        </pre>
+                      </div>
+                    )}
+                    
+                    {debugData.edges?.length > 0 && (
+                      <div className="mt-2">
+                        <div className="text-green-400 mb-1">Sample Edge:</div>
+                        <pre className="bg-gray-800 p-2 rounded text-xs overflow-x-auto">
+                          {JSON.stringify(debugData.edges[0], null, 2)}
+                        </pre>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
-      )}
+        
+        {/* Toggle Button (Only shown when controls are hidden) */}
+        {!showControls && (
+          <Button 
+            onClick={() => setShowControls(true)}
+            className="flex items-center justify-center w-10 h-10 rounded-full bg-gray-800/80 backdrop-blur-sm shadow-lg border border-gray-700 hover:bg-gray-700"
+          >
+            <Info size={18} />
+          </Button>
+        )}
+        
+        {/* Loading indicator */}
+        {(loading || loadingMore) && (
+          <div className="absolute -top-12 right-0 bg-gray-900/80 backdrop-blur-sm rounded-full p-2 shadow-lg border border-gray-800">
+            <div className="flex items-center gap-2 px-2">
+              <div className="animate-spin w-3 h-3 border-2 border-blue-500 border-t-transparent rounded-full"></div>
+              <span className="text-xs">{loading ? 'Loading' : 'Expanding'}</span>
+            </div>
+          </div>
+        )}
+      </div>
       
       {/* Modal for node details */}
       <Dialog open={openModal} onOpenChange={setOpenModal}>
@@ -1053,19 +1275,6 @@ return (
           )}
         </DialogContent>
       </Dialog>
-      <GraphControls 
-        loading={loading} 
-        loadingMore={loadingMore}
-        nodeCount={graphData.nodes.length} 
-        expandedNodes={expandedNodes.size}
-        toggleAutomaticLoading={toggleAutomaticLoading}
-        isAutoLoadingEnabled={isAutoLoadingEnabled}
-        clearGraph={clearGraph}
-        resetView={resetView}
-        maxNodesSliderValue={maxNodesLimit}
-        setMaxNodesSliderValue={setMaxNodesLimit}
-        centerNodeDescription={graphData.nodes.find(n => n.isCenter)?.description}
-      />
     </div>
   );
 };
