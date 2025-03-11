@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import ForceGraph2D from 'react-force-graph-2d';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './components/ui/dialog';
-import { Info, ZoomIn, ZoomOut, Download } from 'lucide-react';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from './components/ui/sheet';
+import { Slider } from './components/ui/slider';
 import { Button } from './components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './components/ui/dialog';
+import { Menu, ZoomIn, ZoomOut, Download, Info } from 'lucide-react';
 import GraphControls from './components/GraphControls';
-import SimpleNavBar from './components/SimpleNavBar';
+import NavBar from './components/NavBar';
 import _ from 'lodash';
 
 const ImageSimilarityExplorer = () => {
@@ -18,10 +20,11 @@ const ImageSimilarityExplorer = () => {
   const [debugData, setDebugData] = useState(null);
   const [openModal, setOpenModal] = useState(false);
   const [selectedNode, setSelectedNode] = useState(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [expandedNodes, setExpandedNodes] = useState(new Set());
   const [isAutoLoadingEnabled, setIsAutoLoadingEnabled] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [maxNodesLimit, setMaxNodesLimit] = useState(200);
+  const [maxNodesLimit, setMaxNodesLimit] = useState(500);
   const [extendedMode, setExtendedMode] = useState(true);  // Enable by default
   const [neighborDepth, setNeighborDepth] = useState(2);
   const [limitPerLevel, setLimitPerLevel] = useState(10);
@@ -106,15 +109,40 @@ const ImageSimilarityExplorer = () => {
     });
   }, [getImageUrl]);
 
+  // Merge graph data without duplicates
+  const mergeGraphData = useCallback((currentData, newData) => {
+    // Convert newData.edges to expected format
+    const newLinks = newData.edges ? newData.edges.map(edge => ({
+      id: edge.id,
+      source: edge.source,
+      target: edge.target,
+      value: edge.weight
+    })) : [];
+    
+    // Get current node and link IDs
+    const existingNodeIds = new Set(currentData.nodes.map(n => n.id));
+    const existingLinkIds = new Set(currentData.links.map(l => l.id));
+    
+    // Add new nodes that don't already exist
+    const filteredNewNodes = newData.nodes ? 
+      newData.nodes.filter(node => !existingNodeIds.has(node.id)) : 
+      [];
+    
+    // Add new links that don't already exist
+    const filteredNewLinks = newLinks.filter(link => !existingLinkIds.has(link.id));
+    
+    // Return merged data
+    return {
+      nodes: [...currentData.nodes, ...filteredNewNodes],
+      links: [...currentData.links, ...filteredNewLinks]
+    };
+  }, []);
+
+
+
   // updated loading queue function
   const processLoadQueue = useCallback(async () => {
-    // Clear queue if we're not processing or had an error
-    if (!processingQueue.current) {
-      console.log("Starting queue processing");
-    }
-    
     if (loadQueue.current.length === 0) {
-      console.log("Queue empty, stopping processing");
       processingQueue.current = false;
       setLoadingMore(false);
       return;
@@ -132,25 +160,17 @@ const ImageSimilarityExplorer = () => {
     processingQueue.current = true;
     setLoadingMore(true);
     
+    // Take first node from the queue
+    const nodeId = loadQueue.current.shift();
+    
+    // Skip if already expanded
+    if (expandedNodes.has(nodeId)) {
+      setLoadingMore(false);
+      setTimeout(() => processLoadQueue(), 50);
+      return;
+    }
+    
     try {
-      // Take first node from the queue
-      const nodeId = loadQueue.current.shift();
-      
-      if (!nodeId) {
-        console.warn("Attempted to process undefined nodeId");
-        setLoadingMore(false);
-        processingQueue.current = false;
-        return;
-      }
-      
-      // Skip if already expanded
-      if (expandedNodes.has(nodeId)) {
-        console.log(`Node ${nodeId} already expanded, skipping`);
-        setLoadingMore(false);
-        setTimeout(() => processLoadQueue(), 50);
-        return;
-      }
-      
       // Find the node in the current graph data
       const node = graphData.nodes.find(n => n.id === nodeId);
       if (!node) {
@@ -159,28 +179,11 @@ const ImageSimilarityExplorer = () => {
         setTimeout(() => processLoadQueue(), 50);
         return;
       }
-    
+  
       console.log(`Expanding node: ${node.path} (ID: ${nodeId})`);
-      
-      // Defensive check for valid path
-      if (!node.path) {
-        console.error(`Node ${nodeId} has no path property`);
-        setLoadingMore(false);
-        setTimeout(() => processLoadQueue(), 50);
-        return;
-      }
       
       // Load neighbors for this node
       const filename = getImageName(node.path);
-      
-      if (!filename) {
-        console.error(`Failed to get filename from path: ${node.path}`);
-        setLoadingMore(false);
-        setTimeout(() => processLoadQueue(), 50);
-        return;
-      }
-      
-      console.log(`Fetching neighbors for ${filename}`);
       const response = await fetch(
         `http://localhost:5001/neighbors?image_path=${encodeURIComponent(filename)}&threshold=${similarityThreshold}&limit=${neighborLimit}`
       );
@@ -190,172 +193,120 @@ const ImageSimilarityExplorer = () => {
       }
       
       const data = await response.json();
-      console.log(`Received ${data.nodes?.length || 0} nodes and ${data.edges?.length || 0} edges`);
-      
-      // Validate response data
-      if (!data.nodes || !Array.isArray(data.nodes) || !data.edges || !Array.isArray(data.edges)) {
-        console.error("Invalid response data structure:", data);
-        setLoadingMore(false);
-        setTimeout(() => processLoadQueue(), 50);
-        return;
-      }
+      console.log(`Received ${data.nodes.length} nodes and ${data.edges.length} edges`);
       
       // Create a deep copy of the current graph data
       const newGraphData = {
         nodes: [...graphData.nodes],
         links: [...graphData.links]
       };
-    
+  
       // Track added nodes to avoid duplicates
       const addedNodeIds = new Set();
-    
+  
       // Add new nodes that don't already exist
       data.nodes.forEach(node => {
-        if (!node || !node.id || !node.path) {
-          console.warn("Skipping invalid node:", node);
-          return;
-        }
-        
         if (!newGraphData.nodes.some(n => n.id === node.id)) {
           addedNodeIds.add(node.id);
           newGraphData.nodes.push({
             id: node.id,
             path: node.path,
-            label: node.label || getImageName(node.path) || "Unknown",
-            description: node.description || "",
-            isCenter: node.isCenter || false,
+            label: node.label || getImageName(node.path),
+            description: node.description,
+            isCenter: false,
             level: node.level !== undefined ? node.level : 1
           });
         }
       });
-    
+  
       // Add new edges that don't already exist
       data.edges.forEach(edge => {
-        if (!edge || !edge.id || !edge.source || !edge.target) {
-          console.warn("Skipping invalid edge:", edge);
-          return;
-        }
-        
         const linkId = edge.id;
         if (!newGraphData.links.some(l => l.id === linkId)) {
           newGraphData.links.push({
             id: linkId,
             source: edge.source,
             target: edge.target,
-            value: edge.weight || 0.5 // Default value if missing
+            value: edge.weight
           });
         }
       });
       
-      // Mark node as expanded first (before updating graph to prevent race conditions)
+      // Update graph data
+      setGraphData(newGraphData);
+      
+      // Mark node as expanded
       setExpandedNodes(prev => {
         const newSet = new Set(prev);
         newSet.add(nodeId);
         return newSet;
       });
       
-      // Update graph data
-      setGraphData(newGraphData);
-      
       // Preload images for new nodes
-      if (addedNodeIds.size > 0) {
-        console.log(`Preloading ${addedNodeIds.size} new images`);
-        Array.from(addedNodeIds).forEach(id => {
-          const node = newGraphData.nodes.find(n => n.id === id);
-          if (node && node.path) {
-            preloadImage(node.path).catch(err => console.warn(`Failed to preload ${node.path}:`, err));
-          }
-        });
-      }
-    
+      Array.from(addedNodeIds).forEach(id => {
+        const node = newGraphData.nodes.find(n => n.id === id);
+        if (node) {
+          preloadImage(node.path).catch(() => {});
+        }
+      });
+  
       console.log(`Added ${addedNodeIds.size} new nodes`);
-    
+  
     } catch (error) {
-      console.error(`Error expanding node:`, error);
-    } finally {
-      setLoadingMore(false);
-      
-      // Continue processing queue with a delay
-      if (loadQueue.current.length > 0) {
-        setTimeout(() => {
-          if (processingQueue.current) {
-            processLoadQueue();
-          }
-        }, 300);
-      } else {
-        processingQueue.current = false;
-      }
+      console.error(`Error expanding node ${nodeId}:`, error);
     }
+      
+    setLoadingMore(false);
+    
+    // Process next batch with a short delay
+    setTimeout(() => processLoadQueue(), 300);
   }, [graphData, expandedNodes, getImageName, maxNodesLimit, neighborLimit, preloadImage, similarityThreshold]);
 
   // Viewport change handler
   const handleViewportChange = useCallback(() => {
     if (!graphRef.current) return;
-    try {
-      // Get current viewport information
-      const zoomState = graphRef.current.zoom();
-      if (!zoomState) {
-        console.warn("No zoom state available");
-        return;
-      }
+    
+    // Get current viewport information
+    const { x, y, k } = graphRef.current.zoom();
+    
+    // Use window dimensions
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+    
+    // Calculate viewport boundaries with buffer
+    const bounds = {
+      xMin: (0 - x) / k - 200,
+      xMax: (width - x) / k + 200,
+      yMin: (0 - y) / k - 200,
+      yMax: (height - y) / k + 200
+    };
+    
+    viewportBoundsRef.current = bounds;
+    
+    // If auto-loading is enabled and not in extended mode, find nodes to expand
+    if (isAutoLoadingEnabled && !extendedMode && graphData.nodes.length > 0) {
+      // Find visible nodes
+      const visibleNodes = graphData.nodes.filter(node => 
+        node.x >= bounds.xMin && node.x <= bounds.xMax &&
+        node.y >= bounds.yMin && node.y <= bounds.yMax
+      );
       
-      const { x, y, k } = zoomState;
+      // Find unexpanded visible nodes
+      const unexpandedNodes = visibleNodes.filter(node => 
+        !expandedNodes.has(node.id) && 
+        !loadQueue.current.includes(node.id)
+      );
       
-      // Use window dimensions
-      const width = window.innerWidth;
-      const height = window.innerHeight;
-      
-      // Calculate viewport boundaries with buffer
-      const bounds = {
-        xMin: (0 - x) / k - 200,
-        xMax: (width - x) / k + 200,
-        yMin: (0 - y) / k - 200,
-        yMax: (height - y) / k + 200
-      };
-      
-      viewportBoundsRef.current = bounds;
-      
-      // If auto-loading is enabled and not in extended mode, find nodes to expand
-      if (isAutoLoadingEnabled && !extendedMode && graphData.nodes.length > 0) {
-        // Check if we're already processing too many nodes
-        if (processingQueue.current && loadQueue.current.length > 5) {
-          console.log("Skipping viewport expansion - already processing queue");
-          return;
-        }
+      // Add to load queue (max 3)
+      const nodesToQueue = unexpandedNodes.slice(0, 3);
+      if (nodesToQueue.length > 0) {
+        loadQueue.current.push(...nodesToQueue.map(node => node.id));
         
-        // Find visible nodes with valid coordinates
-        const visibleNodes = graphData.nodes.filter(node => 
-          node && 
-          typeof node.x === 'number' && typeof node.y === 'number' &&
-          node.x >= bounds.xMin && node.x <= bounds.xMax &&
-          node.y >= bounds.yMin && node.y <= bounds.yMax
-        );
-        
-        // Early exit if no visible nodes
-        if (visibleNodes.length === 0) return;
-        
-        // Find unexpanded visible nodes
-        const unexpandedNodes = visibleNodes.filter(node => 
-          node.id && 
-          !expandedNodes.has(node.id) && 
-          !loadQueue.current.includes(node.id)
-        );
-        
-        // Add to load queue (max 2 at a time to avoid overwhelming)
-        const nodesToQueue = unexpandedNodes.slice(0, 2);
-        if (nodesToQueue.length > 0) {
-          console.log(`Adding ${nodesToQueue.length} visible nodes to expansion queue`);
-          const nodeIds = nodesToQueue.map(node => node.id).filter(Boolean);
-          loadQueue.current.push(...nodeIds);
-          
-          // Start processing queue if not already
-          if (!processingQueue.current) {
-            processLoadQueue();
-          }
+        // Start processing queue if not already
+        if (!processingQueue.current) {
+          processLoadQueue();
         }
       }
-    } catch (error) {
-      console.error("Error in viewport change handler:", error);
     }
   }, [expandedNodes, graphData.nodes, isAutoLoadingEnabled, extendedMode, processLoadQueue]);
 
@@ -373,14 +324,6 @@ useEffect(() => {
   }
 }, [extendedMode]);
 
-// Force neighborDepth to 3 right before fetch when in extended mode
-useEffect(() => {
-  if (extendedMode && neighborDepth !== 3) {
-    console.log("Forcing depth to 3 for extended mode");
-    setNeighborDepth(3);
-  }
-}, [extendedMode, neighborDepth, centerImage]);
-
 // Fetch graph data from API
 useEffect(() => {
   const fetchData = async () => {
@@ -395,13 +338,9 @@ useEffect(() => {
       
       // Choose endpoint and parameters based on mode
       let url;
-      
-      // Force depth 3 for extended mode
-      const effectiveDepth = extendedMode ? 3 : neighborDepth;
-      
       if (extendedMode) {
-        url = `http://localhost:5001/extended-neighbors?image_path=${encodeURIComponent(filename)}&threshold=${similarityThreshold}&depth=${effectiveDepth}&limit_per_level=${limitPerLevel}&max_nodes=${maxNodesLimit}`;
-        console.log(`Fetching extended data for ${centerImage} with depth ${effectiveDepth}`);
+        url = `http://localhost:5001/extended-neighbors?image_path=${encodeURIComponent(filename)}&threshold=${similarityThreshold}&depth=${neighborDepth}&limit_per_level=${limitPerLevel}&max_nodes=${maxNodesLimit}`;
+        console.log(`Fetching extended data for ${centerImage} with depth ${neighborDepth}`);
       } else {
         url = `http://localhost:5001/neighbors?image_path=${encodeURIComponent(filename)}&threshold=${similarityThreshold}&limit=${neighborLimit}`;
         console.log(`Fetching direct neighbors for ${centerImage}`);
@@ -722,7 +661,7 @@ return (
       </svg>
     </div>
     
-    <SimpleNavBar 
+    <NavBar 
       centerImage={centerImage}
       getImageName={getImageName}
       similarityThreshold={similarityThreshold}
@@ -735,6 +674,7 @@ return (
       setNeighborDepth={setNeighborDepth}
       limitPerLevel={limitPerLevel}
       setLimitPerLevel={setLimitPerLevel}
+      onSelectImage={setCenterImage}
       setDebugData={setDebugData}
       debugData={debugData}
       handleResetZoom={handleResetZoom}
@@ -844,6 +784,15 @@ return (
                 ctx.arc(node.x, node.y, nodeR + 1, 0, 2 * Math.PI);
                 ctx.stroke();
               }
+              
+              // // Draw node label when zoomed in
+              // if (globalScale >= 0.8) {
+              //   ctx.font = `${fontSize}px Sans-Serif`;
+              //   ctx.textAlign = 'center';
+              //   ctx.textBaseline = 'bottom';
+              //   ctx.fillStyle = 'white';
+              //   ctx.fillText(label, node.x, node.y - nodeR - 2);
+              // }
             }}
             cooldownTicks={100}
             d3AlphaDecay={0.02}
