@@ -24,8 +24,13 @@ run ```npm start```
 
 ---
 
-current state
-![alt text](image-4.png)
+### current state
+
+##### single node mode
+![alt text](image-6.png)
+
+##### extended graph mode - max neighbors
+![alt text](image-5.png)
 
 
 ---
