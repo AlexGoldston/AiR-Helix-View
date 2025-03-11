@@ -360,8 +360,6 @@ useEffect(() => {
       console.log("API response:", apiData);
       setDebugData(apiData);
       
-      // Rest of your data processing...
-      
       // Transform the API response to match ForceGraph expected format
       const graphData = {
         nodes: [],
@@ -382,7 +380,9 @@ useEffect(() => {
           path: node.path,
           label: node.label || getImageName(node.path),
           isCenter: node.isCenter || false,
-          level: node.level || 0  // Use level if available for coloring
+          level: node.level || 0,  // Use level if available for coloring
+          // Pin center node in place to stop it from moving during simulation
+          ...(node.isCenter ? { fx: 0, fy: 0 } : {})
         });
       }
       
@@ -404,22 +404,59 @@ useEffect(() => {
       );
       
       await Promise.allSettled(preloadPromises);
+      
+      // Set the graph data
       setGraphData(graphData);
       
-      // Adjust graph physics after setting data
-      if (graphRef.current) {
-        setTimeout(() => {
+      // Adjust graph physics after setting data with better timing
+      setTimeout(() => {
+        if (graphRef.current) {
+          // Reset forces with better configurations
           if (graphRef.current.d3Force('charge')) {
-            // Stronger charge force for more spread out display when in extended mode
-            graphRef.current.d3Force('charge').strength(extendedMode ? -700 : -500);
+            // Adjust charge force based on node count
+            const nodeCount = graphData.nodes.length;
+            const baseStrength = extendedMode ? -500 : -300;
+            // Reduce strength for larger graphs to prevent excessive spread
+            const strength = baseStrength * (1 - Math.min(0.5, nodeCount / 200));
+            graphRef.current.d3Force('charge').strength(strength);
           }
+          
           if (graphRef.current.d3Force('link')) {
-            // Extended mode may need longer links for better visibility
-            graphRef.current.d3Force('link').distance(extendedMode ? 200 : 150);
+            // More dynamic link distances based on similarity
+            graphRef.current.d3Force('link').distance(link => {
+              // Stronger similarities should result in shorter distances
+              const similarityFactor = link.value || 0.5;
+              // Base distance differs by mode
+              const baseDistance = extendedMode ? 150 : 100;
+              // More similar nodes are closer together
+              return baseDistance * (1 - similarityFactor) + 30;
+            });
           }
-          graphRef.current.zoomToFit(1000);
-        }, 1000);
-      }
+          
+          // Add collision force for stability
+          if (graphRef.current.d3Force('collision')) {
+            graphRef.current.d3Force('collision').radius(20);
+          }
+          
+          // Strengthen center force temporarily to help layout
+          if (graphRef.current.d3Force('center')) {
+            graphRef.current.d3Force('center').strength(0.2);
+          }
+          
+          // Reheat simulation with more iterations for better initial layout
+          graphRef.current.d3ReheatSimulation();
+          
+          // Zoom to fit with padding around the graph
+          graphRef.current.zoomToFit(800, 50);
+          
+          // Reduce center force after initial layout
+          setTimeout(() => {
+            if (graphRef.current && graphRef.current.d3Force('center')) {
+              graphRef.current.d3Force('center').strength(0.05);
+            }
+          }, 1000);
+        }
+      }, 100); // Shorter initial delay
     } catch (err) {
       console.error("Error fetching graph data:", err);
       setError(err.message);
@@ -429,7 +466,7 @@ useEffect(() => {
   };
   
   fetchData();
-}, [centerImage, similarityThreshold, neighborLimit, extendedMode, neighborDepth, limitPerLevel, maxNodesLimit, getImageName, preloadImage, mergeGraphData]);
+}, [centerImage, similarityThreshold, neighborLimit, extendedMode, neighborDepth, limitPerLevel, maxNodesLimit, getImageName, preloadImage]);
 
 // Effect to calculate initial viewport
 useEffect(() => {
