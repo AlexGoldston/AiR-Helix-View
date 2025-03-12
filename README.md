@@ -38,7 +38,9 @@ run ```npm start```
 ![alt text](image-2.png)
 
 basic run ```python database_update_incremental.py```
+
 adv run ```python update_database_incremental.py --images-dir "/path/to/new/images" --threshold 0.4 --force-gpu --verbose```
+
 use these flags:
 ```
 --images-dir PATH     Directory containing images to add
