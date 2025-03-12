@@ -1,0 +1,687 @@
+2025-03-12 22:23:26,838 - INFO - Loaded environment variables
+2025-03-12 22:23:32,587 - INFO - Successfully imported update_graph function
+2025-03-12 22:23:32,589 - INFO - Using images directory: C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images
+2025-03-12 22:23:32,590 - INFO - Starting database update with:
+2025-03-12 22:23:32,590 - INFO -   - Images dir: C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images
+2025-03-12 22:23:32,590 - INFO -   - Similarity threshold: 0.35
+2025-03-12 22:23:32,590 - INFO -   - Generate descriptions: True
+2025-03-12 22:23:32,590 - INFO -   - Use ML descriptions: True
+2025-03-12 22:23:32,591 - INFO -   - Force GPU: False
+2025-03-12 22:23:32,591 - INFO - Starting incremental graph update from C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images
+2025-03-12 22:23:32,591 - INFO - Similarity threshold: 0.35
+2025-03-12 22:23:32,591 - INFO - Generate descriptions: True
+2025-03-12 22:23:32,592 - INFO - Use ML descriptions: True
+2025-03-12 22:23:32,647 - INFO - Use pytorch device_name: cuda
+2025-03-12 22:23:32,647 - INFO - Load pretrained SentenceTransformer: clip-ViT-B-32
+2025-03-12 22:23:35,755 - INFO - Attempting to connect to Neo4j at bolt://localhost:7687
+2025-03-12 22:23:35,755 - INFO - Username: neo4j
+2025-03-12 22:23:35,756 - INFO - Neo4j Rust extension not available, using standard Python implementation
+2025-03-12 22:23:37,808 - INFO - Successfully connected to Neo4j!
+2025-03-12 22:23:37,809 - INFO - Neo4j driver details:
+2025-03-12 22:23:37,809 - INFO -   - Driver version: 5.28.1
+2025-03-12 22:23:37,809 - INFO -   - Rust extension: Disabled
+2025-03-12 22:23:37,809 - INFO -   - Connection pool size: 50
+2025-03-12 22:23:37,847 - INFO - transformers library available for image descriptions
+2025-03-12 22:23:37,847 - INFO - initialising ImageDescriptionGenerator with model: Salesforce/blip-image-captioning-base
+2025-03-12 22:23:37,847 - INFO - Using device: cuda
+2025-03-12 22:23:42,991 - INFO - Model loaded successfully on cuda
+2025-03-12 22:23:42,992 - INFO - GPU: NVIDIA GeForce RTX 4080
+2025-03-12 22:23:42,992 - INFO - CUDA version: 12.1
+2025-03-12 22:23:42,992 - INFO - Using ML-based description generator
+2025-03-12 22:23:43,184 - INFO - Found 1704 existing images in database
+2025-03-12 22:23:43,237 - INFO - Found 3640 images in directory
+2025-03-12 22:23:43,245 - INFO - Found 232 new images to add
+2025-03-12 22:23:55,905 - INFO - Embeddings generated: 232 successful, 0 failed
+2025-03-12 22:23:55,906 - INFO - Using batch processing for descriptions
+2025-03-12 22:23:55,906 - INFO - Processing batch 1 (8 images)
+2025-03-12 22:23:57,100 - INFO - Processing batch 2 (8 images)
+2025-03-12 22:23:58,098 - INFO - Processing batch 3 (8 images)
+2025-03-12 22:23:59,056 - INFO - Processing batch 4 (8 images)
+2025-03-12 22:23:59,842 - INFO - Processing batch 5 (8 images)
+2025-03-12 22:24:00,605 - INFO - Processing batch 6 (8 images)
+2025-03-12 22:24:01,325 - INFO - Processing batch 7 (8 images)
+2025-03-12 22:24:02,037 - INFO - Processing batch 8 (8 images)
+2025-03-12 22:24:02,763 - INFO - Processing batch 9 (8 images)
+2025-03-12 22:24:03,586 - INFO - Processing batch 10 (8 images)
+2025-03-12 22:24:04,345 - INFO - Processing batch 11 (8 images)
+2025-03-12 22:24:05,136 - INFO - Processing batch 12 (8 images)
+2025-03-12 22:24:05,943 - INFO - Processing batch 13 (8 images)
+2025-03-12 22:24:06,663 - INFO - Processing batch 14 (8 images)
+2025-03-12 22:24:07,534 - INFO - Processing batch 15 (8 images)
+2025-03-12 22:24:08,265 - INFO - Processing batch 16 (8 images)
+2025-03-12 22:24:09,018 - INFO - Processing batch 17 (8 images)
+2025-03-12 22:24:09,897 - INFO - Processing batch 18 (8 images)
+2025-03-12 22:24:10,662 - INFO - Processing batch 19 (8 images)
+2025-03-12 22:24:11,431 - INFO - Processing batch 20 (8 images)
+2025-03-12 22:24:12,138 - INFO - Processing batch 21 (8 images)
+2025-03-12 22:24:12,837 - INFO - Processing batch 22 (8 images)
+2025-03-12 22:24:13,550 - INFO - Processing batch 23 (8 images)
+2025-03-12 22:24:14,364 - INFO - Processing batch 24 (8 images)
+2025-03-12 22:24:15,150 - INFO - Processing batch 25 (8 images)
+2025-03-12 22:24:15,856 - INFO - Processing batch 26 (8 images)
+2025-03-12 22:24:16,693 - INFO - Processing batch 27 (8 images)
+2025-03-12 22:24:17,434 - INFO - Processing batch 28 (8 images)
+2025-03-12 22:24:18,218 - INFO - Processing batch 29 (8 images)
+2025-03-12 22:24:19,117 - INFO - Generated 116 descriptions in 23.21 seconds
+2025-03-12 22:24:19,119 - INFO - Generated 116 descriptions using batch processing
+2025-03-12 22:24:19,120 - INFO - Descriptions generated: 116
+2025-03-12 22:24:19,751 - INFO - Extracting and storing image features for new images...
+2025-03-12 22:24:19,751 - INFO - ML feature extraction available for: 
+2025-03-12 22:24:19,751 - INFO - Feature extractor initialized. ML features: True
+2025-03-12 22:24:19,816 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\goodison_park04.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:24:20,170 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\goodison_park05.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:24:20,246 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\goodison_park06.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:24:20,317 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\goodison_park07.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:24:20,381 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\goodison_park08.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:24:20,437 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\goodison_park09.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:24:20,497 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\goodison_park10.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:24:20,553 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\goodison_park11.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:24:20,610 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\goodison_park12.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:24:20,663 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\goodison_park13.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:24:20,740 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\goodison_park14.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:24:20,821 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\goodison_park16.jpg in 0.07 seconds. 7 tags generated.
+2025-03-12 22:24:20,899 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\goodison_park17.jpg in 0.07 seconds. 7 tags generated.
+2025-03-12 22:24:20,984 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\goodison_park18.jpg in 0.07 seconds. 7 tags generated.
+2025-03-12 22:24:21,050 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\goodison_park19.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:24:21,155 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\goodison_park20.jpg in 0.09 seconds. 7 tags generated.
+2025-03-12 22:24:21,226 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\goodison_park21.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:24:21,316 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\goodison_park22.jpg in 0.08 seconds. 7 tags generated.
+2025-03-12 22:24:21,379 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\goodison_park23.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:24:21,440 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\goodison_park24.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:24:21,496 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\goodison_park25.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:24:21,563 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\goodison_park26.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:24:21,631 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\goodison_park27.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:24:21,691 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\goodison_park31.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:24:21,745 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\goodison_park32.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:24:21,796 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\goodison_park33.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:24:21,850 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\stamford_bridge01.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:24:21,924 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\stamford_bridge02.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:24:21,997 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\stamford_bridge03.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:24:22,053 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\stamford_bridge04.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:24:22,128 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\stamford_bridge05.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:24:22,197 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\stamford_bridge06.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:24:22,255 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\stamford_bridge07.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:24:22,316 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\stamford_bridge08.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:24:22,373 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\stamford_bridge09.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:24:22,432 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\stamford_bridge10.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:24:22,496 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\stamford_bridge11.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:24:22,556 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\stamford_bridge12.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:24:22,611 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\stamford_bridge25.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:24:22,668 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\stamford_bridge26.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:24:22,720 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\stamford_bridge27.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:24:22,772 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\stamford_bridge28.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:24:22,824 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\stamford_bridge29.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:24:22,874 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\stamford_bridge30.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:24:22,928 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\stamford_bridge31.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:24:22,979 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\stamford_bridge32.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:24:23,033 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\stamford_bridge33.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:24:23,102 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\st_marys_stadium01.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:24:23,170 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\st_marys_stadium02.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:24:23,241 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\st_marys_stadium03.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:24:23,294 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\st_marys_stadium04.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:24:23,348 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\st_marys_stadium05.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:24:23,401 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\st_marys_stadium06.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:24:23,453 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\st_marys_stadium07.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:24:23,503 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\st_marys_stadium08.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:24:23,575 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\st_marys_stadium09.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:24:23,647 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\st_marys_stadium10.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:24:23,697 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\st_marys_stadium11.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:24:23,750 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\st_marys_stadium12.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:24:23,808 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\st_marys_stadium13.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:24:23,856 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\st_marys_stadium14.jpg in 0.03 seconds. 7 tags generated.
+2025-03-12 22:24:23,908 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\villa_park01.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:24:23,964 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\villa_park02.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:24:24,019 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\villa_park03.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:24:24,093 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\villa_park04.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:24:24,167 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\villa_park05.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:24:24,239 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\villa_park06.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:24:24,313 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\villa_park07.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:24:24,389 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\villa_park08.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:24:24,467 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\villa_park09.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:24:24,545 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\villa_park10.jpg in 0.07 seconds. 7 tags generated.
+2025-03-12 22:24:24,617 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\villa_park11.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:24:24,688 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\villa_park12.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:24:24,762 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\villa_park13.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:24:24,836 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\villa_park14.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:24:24,907 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\villa_park15.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:24:24,979 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\villa_park16.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:24:25,041 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\villa_park17.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:24:25,097 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\villa_park18.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:24:25,154 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\villa_park19.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:24:25,210 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\villa_park20.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:24:25,273 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\villa_park21.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:24:25,336 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\villa_park22.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:24:25,394 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\villa_park23.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:24:25,451 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\villa_park24.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:24:25,529 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\walkers_stadium01.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:24:25,610 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\walkers_stadium02.jpg in 0.07 seconds. 7 tags generated.
+2025-03-12 22:24:25,674 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\walkers_stadium03.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:24:25,744 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\walkers_stadium05.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:24:25,822 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\walkers_stadium06.jpg in 0.07 seconds. 7 tags generated.
+2025-03-12 22:24:25,890 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\walkers_stadium07.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:24:25,959 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\walkers_stadium08.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:24:26,032 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\walkers_stadium12.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:24:26,098 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\walkers_stadium13.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:24:26,157 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\walkers_stadium14.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:24:26,219 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\walkers_stadium15.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:24:26,278 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\walkers_stadium16.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:24:26,330 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\walkers_stadium17.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:24:26,387 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\walkers_stadium18.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:24:26,451 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\walkers_stadium19.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:24:26,515 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\walkers_stadium21.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:24:26,599 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\walkers_stadium22.jpg in 0.07 seconds. 7 tags generated.
+2025-03-12 22:24:26,688 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\walkers_stadium23.jpg in 0.07 seconds. 7 tags generated.
+2025-03-12 22:24:26,762 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\walkers_stadium24.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:24:26,849 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\walkers_stadium25.jpg in 0.08 seconds. 7 tags generated.
+2025-03-12 22:24:26,923 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\walkers_stadium26.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:24:26,995 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\walkers_stadium27.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:24:27,070 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\walkers_stadium28.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:24:27,140 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\walkers_stadium29.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:24:27,218 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\walkers_stadium30.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:24:27,295 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\walkers_stadium31.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:24:27,372 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\walkers_stadium32.jpg in 0.07 seconds. 7 tags generated.
+2025-03-12 22:24:27,447 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\walkers_stadium33.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:24:27,519 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\walkers_stadium34.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:24:27,595 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\walkers_stadium35.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:24:27,664 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\walkers_stadium36.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:24:27,719 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\goodison_park04.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:24:27,904 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\goodison_park05.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:24:27,974 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\goodison_park06.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:24:28,029 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\goodison_park07.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:24:28,082 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\goodison_park08.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:24:28,137 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\goodison_park09.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:24:28,194 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\goodison_park10.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:24:28,254 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\goodison_park11.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:24:28,309 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\goodison_park12.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:24:28,362 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\goodison_park13.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:24:28,446 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\goodison_park14.jpg in 0.07 seconds. 7 tags generated.
+2025-03-12 22:24:28,527 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\goodison_park16.jpg in 0.07 seconds. 7 tags generated.
+2025-03-12 22:24:28,615 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\goodison_park17.jpg in 0.08 seconds. 7 tags generated.
+2025-03-12 22:24:28,704 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\goodison_park18.jpg in 0.08 seconds. 7 tags generated.
+2025-03-12 22:24:28,775 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\goodison_park19.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:24:28,892 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\goodison_park20.jpg in 0.11 seconds. 7 tags generated.
+2025-03-12 22:24:28,965 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\goodison_park21.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:24:29,032 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\goodison_park22.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:24:29,096 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\goodison_park23.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:24:29,161 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\goodison_park24.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:24:29,223 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\goodison_park25.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:24:29,292 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\goodison_park26.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:24:29,359 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\goodison_park27.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:24:29,416 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\goodison_park31.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:24:29,469 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\goodison_park32.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:24:29,520 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\goodison_park33.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:24:29,574 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\stamford_bridge01.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:24:29,648 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\stamford_bridge02.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:24:29,726 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\stamford_bridge03.jpg in 0.07 seconds. 7 tags generated.
+2025-03-12 22:24:29,782 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\stamford_bridge04.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:24:29,847 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\stamford_bridge05.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:24:29,914 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\stamford_bridge06.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:24:29,972 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\stamford_bridge07.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:24:30,030 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\stamford_bridge08.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:24:30,089 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\stamford_bridge09.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:24:30,147 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\stamford_bridge10.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:24:30,215 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\stamford_bridge11.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:24:30,272 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\stamford_bridge12.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:24:30,325 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\stamford_bridge25.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:24:30,378 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\stamford_bridge26.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:24:30,427 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\stamford_bridge27.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:24:30,481 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\stamford_bridge28.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:24:30,535 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\stamford_bridge29.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:24:30,589 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\stamford_bridge30.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:24:30,640 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\stamford_bridge31.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:24:30,692 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\stamford_bridge32.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:24:30,746 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\stamford_bridge33.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:24:30,813 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\st_marys_stadium01.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:24:30,883 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\st_marys_stadium02.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:24:30,968 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\st_marys_stadium03.jpg in 0.07 seconds. 7 tags generated.
+2025-03-12 22:24:31,020 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\st_marys_stadium04.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:24:31,072 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\st_marys_stadium05.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:24:31,122 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\st_marys_stadium06.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:24:31,171 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\st_marys_stadium07.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:24:31,218 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\st_marys_stadium08.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:24:31,287 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\st_marys_stadium09.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:24:31,358 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\st_marys_stadium10.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:24:31,405 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\st_marys_stadium11.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:24:31,455 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\st_marys_stadium12.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:24:31,502 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\st_marys_stadium13.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:24:31,551 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\st_marys_stadium14.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:24:31,601 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\villa_park01.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:24:31,667 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\villa_park02.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:24:31,731 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\villa_park03.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:24:31,811 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\villa_park04.jpg in 0.07 seconds. 7 tags generated.
+2025-03-12 22:24:31,883 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\villa_park05.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:24:31,953 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\villa_park06.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:24:32,023 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\villa_park07.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:24:32,092 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\villa_park08.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:24:32,158 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\villa_park09.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:24:32,226 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\villa_park10.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:24:32,292 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\villa_park11.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:24:32,361 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\villa_park12.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:24:32,432 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\villa_park13.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:24:32,501 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\villa_park14.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:24:32,567 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\villa_park15.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:24:32,635 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\villa_park16.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:24:32,695 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\villa_park17.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:24:32,749 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\villa_park18.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:24:32,804 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\villa_park19.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:24:32,856 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\villa_park20.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:24:32,912 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\villa_park21.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:24:32,968 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\villa_park22.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:24:33,024 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\villa_park23.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:24:33,077 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\villa_park24.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:24:33,158 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\walkers_stadium01.jpg in 0.07 seconds. 7 tags generated.
+2025-03-12 22:24:33,233 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\walkers_stadium02.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:24:33,285 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\walkers_stadium03.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:24:33,350 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\walkers_stadium05.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:24:33,418 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\walkers_stadium06.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:24:33,483 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\walkers_stadium07.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:24:33,549 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\walkers_stadium08.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:24:33,619 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\walkers_stadium12.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:24:33,682 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\walkers_stadium13.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:24:33,744 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\walkers_stadium14.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:24:33,804 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\walkers_stadium15.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:24:33,861 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\walkers_stadium16.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:24:33,910 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\walkers_stadium17.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:24:33,965 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\walkers_stadium18.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:24:34,029 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\walkers_stadium19.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:24:34,086 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\walkers_stadium21.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:24:34,148 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\walkers_stadium22.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:24:34,208 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\walkers_stadium23.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:24:34,271 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\walkers_stadium24.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:24:34,334 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\walkers_stadium25.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:24:34,399 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\walkers_stadium26.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:24:34,468 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\walkers_stadium27.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:24:34,540 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\walkers_stadium28.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:24:34,611 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\walkers_stadium29.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:24:34,686 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\walkers_stadium30.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:24:34,760 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\walkers_stadium31.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:24:34,841 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\walkers_stadium32.jpg in 0.07 seconds. 7 tags generated.
+2025-03-12 22:24:34,910 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\walkers_stadium33.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:24:34,983 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\walkers_stadium34.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:24:35,053 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\walkers_stadium35.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:24:35,117 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\walkers_stadium36.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:24:35,129 - INFO - Features extracted for 232 new images
+2025-03-12 22:24:36,039 - INFO - Retrieved embeddings for 1704 existing images
+2025-03-12 22:37:39,077 - INFO - Database update complete. Added 232 new images with 203941 new relationships
+2025-03-12 22:37:39,091 - INFO - ==================================================
+2025-03-12 22:37:39,091 - INFO - DATABASE UPDATE COMPLETE
+2025-03-12 22:37:39,091 - INFO - ==================================================
+2025-03-12 22:37:39,092 - INFO - Initial image count: 1704
+2025-03-12 22:37:39,092 - INFO - New images added: 232
+2025-03-12 22:37:39,092 - INFO - Failed to add: 0
+2025-03-12 22:37:39,092 - INFO - Final image count: 1820
+2025-03-12 22:37:39,092 - INFO - New relationships created: 203941
+2025-03-12 22:37:39,092 - INFO - Total time: 852.26 seconds
+2025-03-12 22:41:55,299 - INFO - Loaded environment variables
+2025-03-12 22:42:00,801 - INFO - Successfully imported update_graph function
+2025-03-12 22:42:00,803 - INFO - Using images directory: C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images
+2025-03-12 22:42:00,803 - INFO - Starting database update with:
+2025-03-12 22:42:00,803 - INFO -   - Images dir: C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images
+2025-03-12 22:42:00,803 - INFO -   - Similarity threshold: 0.35
+2025-03-12 22:42:00,803 - INFO -   - Generate descriptions: True
+2025-03-12 22:42:00,803 - INFO -   - Use ML descriptions: True
+2025-03-12 22:42:00,804 - INFO -   - Force GPU: False
+2025-03-12 22:42:00,804 - INFO - Starting incremental graph update from C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images
+2025-03-12 22:42:00,804 - INFO - Similarity threshold: 0.35
+2025-03-12 22:42:00,804 - INFO - Generate descriptions: True
+2025-03-12 22:42:00,804 - INFO - Use ML descriptions: True
+2025-03-12 22:42:00,821 - INFO - Use pytorch device_name: cuda
+2025-03-12 22:42:00,821 - INFO - Load pretrained SentenceTransformer: clip-ViT-B-32
+2025-03-12 22:42:03,580 - INFO - Attempting to connect to Neo4j at bolt://localhost:7687
+2025-03-12 22:42:03,580 - INFO - Username: neo4j
+2025-03-12 22:42:03,581 - INFO - Neo4j Rust extension not available, using standard Python implementation
+2025-03-12 22:42:05,615 - INFO - Successfully connected to Neo4j!
+2025-03-12 22:42:05,616 - INFO - Neo4j driver details:
+2025-03-12 22:42:05,616 - INFO -   - Driver version: 5.28.1
+2025-03-12 22:42:05,616 - INFO -   - Rust extension: Disabled
+2025-03-12 22:42:05,616 - INFO -   - Connection pool size: 50
+2025-03-12 22:42:05,646 - INFO - transformers library available for image descriptions
+2025-03-12 22:42:05,647 - INFO - initialising ImageDescriptionGenerator with model: Salesforce/blip-image-captioning-base
+2025-03-12 22:42:05,647 - INFO - Using device: cuda
+2025-03-12 22:42:10,892 - INFO - Model loaded successfully on cuda
+2025-03-12 22:42:10,893 - INFO - GPU: NVIDIA GeForce RTX 4080
+2025-03-12 22:42:10,893 - INFO - CUDA version: 12.1
+2025-03-12 22:42:10,894 - INFO - Using ML-based description generator
+2025-03-12 22:42:10,940 - INFO - Found 1820 existing images in database
+2025-03-12 22:42:10,986 - INFO - Found 3924 images in directory
+2025-03-12 22:42:10,998 - INFO - Found 284 new images to add
+2025-03-12 22:42:24,044 - INFO - Embeddings generated: 284 successful, 0 failed
+2025-03-12 22:42:24,045 - INFO - Using batch processing for descriptions
+2025-03-12 22:42:24,045 - INFO - Processing batch 1 (8 images)
+2025-03-12 22:42:25,414 - INFO - Processing batch 2 (8 images)
+2025-03-12 22:42:26,174 - INFO - Processing batch 3 (8 images)
+2025-03-12 22:42:26,954 - INFO - Processing batch 4 (8 images)
+2025-03-12 22:42:27,660 - INFO - Processing batch 5 (8 images)
+2025-03-12 22:42:28,376 - INFO - Processing batch 6 (8 images)
+2025-03-12 22:42:29,127 - INFO - Processing batch 7 (8 images)
+2025-03-12 22:42:29,835 - INFO - Processing batch 8 (8 images)
+2025-03-12 22:42:30,571 - INFO - Processing batch 9 (8 images)
+2025-03-12 22:42:31,605 - INFO - Processing batch 10 (8 images)
+2025-03-12 22:42:32,484 - INFO - Processing batch 11 (8 images)
+2025-03-12 22:42:33,244 - INFO - Processing batch 12 (8 images)
+2025-03-12 22:42:34,190 - INFO - Processing batch 13 (8 images)
+2025-03-12 22:42:35,142 - INFO - Processing batch 14 (8 images)
+2025-03-12 22:42:35,931 - INFO - Processing batch 15 (8 images)
+2025-03-12 22:42:36,540 - INFO - Processing batch 16 (8 images)
+2025-03-12 22:42:37,111 - INFO - Processing batch 17 (8 images)
+2025-03-12 22:42:38,026 - INFO - Processing batch 18 (8 images)
+2025-03-12 22:42:39,035 - INFO - Processing batch 19 (8 images)
+2025-03-12 22:42:39,774 - INFO - Processing batch 20 (8 images)
+2025-03-12 22:42:40,580 - INFO - Processing batch 21 (8 images)
+2025-03-12 22:42:41,344 - INFO - Processing batch 22 (8 images)
+2025-03-12 22:42:42,040 - INFO - Processing batch 23 (8 images)
+2025-03-12 22:42:42,763 - INFO - Processing batch 24 (8 images)
+2025-03-12 22:42:43,484 - INFO - Processing batch 25 (8 images)
+2025-03-12 22:42:44,168 - INFO - Processing batch 26 (8 images)
+2025-03-12 22:42:45,058 - INFO - Processing batch 27 (8 images)
+2025-03-12 22:42:45,987 - INFO - Processing batch 28 (8 images)
+2025-03-12 22:42:46,826 - INFO - Processing batch 29 (8 images)
+2025-03-12 22:42:47,583 - INFO - Processing batch 30 (8 images)
+2025-03-12 22:42:48,536 - INFO - Processing batch 31 (8 images)
+2025-03-12 22:42:49,443 - INFO - Processing batch 32 (8 images)
+2025-03-12 22:42:50,194 - INFO - Processing batch 33 (8 images)
+2025-03-12 22:42:50,864 - INFO - Processing batch 34 (8 images)
+2025-03-12 22:42:51,507 - INFO - Processing batch 35 (8 images)
+2025-03-12 22:42:52,367 - INFO - Processing batch 36 (4 images)
+2025-03-12 22:42:52,863 - INFO - Generated 142 descriptions in 28.82 seconds
+2025-03-12 22:42:52,865 - INFO - Generated 142 descriptions using batch processing
+2025-03-12 22:42:52,865 - INFO - Descriptions generated: 142
+2025-03-12 22:42:53,694 - INFO - Extracting and storing image features for new images...
+2025-03-12 22:42:53,694 - INFO - ML feature extraction available for: 
+2025-03-12 22:42:53,694 - INFO - Feature extractor initialized. ML features: True
+2025-03-12 22:42:53,773 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\brentford_community_stadium01.jpg in 0.08 seconds. 7 tags generated.
+2025-03-12 22:42:53,853 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\brentford_community_stadium02.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:42:53,924 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\brentford_community_stadium03.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:42:53,996 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\brentford_community_stadium04.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:42:54,060 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\city_ground01.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:42:54,118 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\city_ground02.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:42:54,168 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\city_ground03.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:42:54,220 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\city_ground04 (1).jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:42:54,275 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\city_ground04.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:42:54,338 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\city_ground05.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:42:54,400 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\city_ground06.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:42:54,461 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\city_ground07.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:42:54,525 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\city_ground08.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:42:54,594 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\city_ground09.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:42:54,661 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\city_ground10.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:42:54,713 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\city_ground14.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:42:54,763 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\city_ground15.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:42:54,813 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\city_ground16.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:42:54,867 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\city_ground17.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:42:54,921 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\city_ground18.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:42:54,973 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\city_ground19.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:42:55,024 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\city_ground20.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:42:55,075 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\city_ground21.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:42:55,129 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\city_ground22.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:42:55,190 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\city_ground23.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:42:55,254 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\city_ground24.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:42:55,310 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\craven_cottage01.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:42:55,366 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\craven_cottage02.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:42:55,423 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\craven_cottage03.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:42:55,477 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\craven_cottage04.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:42:55,531 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\craven_cottage05.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:42:55,586 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\craven_cottage06.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:42:55,640 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\craven_cottage07.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:42:55,693 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\craven_cottage08.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:42:55,745 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\craven_cottage09.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:42:55,803 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\craven_cottage10.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:42:55,858 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\craven_cottage11.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:42:55,912 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\craven_cottage12.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:42:56,002 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\craven_cottage13.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:42:56,057 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\craven_cottage14.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:42:56,115 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\craven_cottage15.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:42:56,167 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\craven_cottage16.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:42:56,221 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\craven_cottage17.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:42:56,276 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\craven_cottage18.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:42:56,331 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\craven_cottage19.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:42:56,391 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\craven_cottage20.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:42:56,446 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\craven_cottage21.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:42:56,497 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\craven_cottage22.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:42:56,554 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\craven_cottage23.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:42:56,607 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\craven_cottage24.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:42:56,658 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\craven_cottage25.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:42:56,710 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\falmer_stadium01.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:42:56,768 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\falmer_stadium02.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:42:56,820 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\falmer_stadium03.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:42:56,881 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\falmer_stadium11.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:42:56,936 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\falmer_stadium12.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:42:56,998 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\falmer_stadium13.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:42:57,059 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\falmer_stadium14.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:42:57,119 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\falmer_stadium15.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:42:57,175 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\falmer_stadium16.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:42:57,239 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\falmer_stadium18.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:42:57,303 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\falmer_stadium19.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:42:57,362 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\falmer_stadium20.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:42:57,425 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\falmer_stadium21.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:42:57,483 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\falmer_stadium22.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:42:57,554 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\falmer_stadium23.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:42:57,625 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\falmer_stadium24.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:42:57,700 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\falmer_stadium25.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:42:57,775 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\falmer_stadium26.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:42:57,849 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\falmer_stadium27.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:42:57,921 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\falmer_stadium28.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:42:57,994 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\falmer_stadium29.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:42:58,069 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\falmer_stadium30.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:42:58,140 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\falmer_stadium31.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:42:58,218 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\falmer_stadium32.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:42:58,301 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\falmer_stadium33.jpg in 0.07 seconds. 7 tags generated.
+2025-03-12 22:42:58,381 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\falmer_stadium34.jpg in 0.07 seconds. 7 tags generated.
+2025-03-12 22:42:58,468 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\falmer_stadium35.jpg in 0.07 seconds. 7 tags generated.
+2025-03-12 22:42:58,549 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\falmer_stadium36.jpg in 0.07 seconds. 7 tags generated.
+2025-03-12 22:42:58,629 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\falmer_stadium37.jpg in 0.07 seconds. 7 tags generated.
+2025-03-12 22:42:58,705 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\falmer_stadium38.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:42:58,769 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\molineux_stadium01.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:42:58,823 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\molineux_stadium02.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:42:58,888 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\molineux_stadium03.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:42:58,951 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\molineux_stadium04.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:42:59,013 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\molineux_stadium05.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:42:59,079 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\molineux_stadium06.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:42:59,141 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\molineux_stadium07.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:42:59,209 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\molineux_stadium08.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:42:59,282 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\molineux_stadium11.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:42:59,360 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\molineux_stadium12.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:42:59,433 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\molineux_stadium13.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:42:59,505 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\molineux_stadium14.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:42:59,582 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\molineux_stadium15.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:42:59,660 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\molineux_stadium16.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:42:59,745 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\molineux_stadium17.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:42:59,824 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\molineux_stadium20.jpg in 0.07 seconds. 7 tags generated.
+2025-03-12 22:42:59,904 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\molineux_stadium21.jpg in 0.07 seconds. 7 tags generated.
+2025-03-12 22:42:59,983 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\molineux_stadium22.jpg in 0.07 seconds. 7 tags generated.
+2025-03-12 22:43:00,054 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\molineux_stadium23.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:43:00,134 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\molineux_stadium24.jpg in 0.07 seconds. 7 tags generated.
+2025-03-12 22:43:00,208 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\molineux_stadium25.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:43:00,283 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\molineux_stadium26.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:43:00,348 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\molineux_stadium27.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:43:00,420 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\molineux_stadium28.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:43:00,489 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\molineux_stadium29.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:43:00,567 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\molineux_stadium30.jpg in 0.07 seconds. 7 tags generated.
+2025-03-12 22:43:00,641 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\molineux_stadium31.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:43:00,724 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\molineux_stadium32.jpg in 0.07 seconds. 7 tags generated.
+2025-03-12 22:43:00,785 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\molineux_stadium33.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:43:00,859 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\molineux_stadium34.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:43:00,906 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\portman_road01.jpg in 0.03 seconds. 7 tags generated.
+2025-03-12 22:43:00,955 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\portman_road02.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:43:01,003 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\portman_road03.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:43:01,049 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\portman_road04.jpg in 0.03 seconds. 7 tags generated.
+2025-03-12 22:43:01,094 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\portman_road05.jpg in 0.03 seconds. 7 tags generated.
+2025-03-12 22:43:01,157 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\portman_road06.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:43:01,214 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\portman_road07.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:43:01,260 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\portman_road08.jpg in 0.03 seconds. 7 tags generated.
+2025-03-12 22:43:01,310 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\portman_road09.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:43:01,367 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\portman_road10.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:43:01,412 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\portman_road11.jpg in 0.03 seconds. 7 tags generated.
+2025-03-12 22:43:01,457 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\portman_road12.jpg in 0.03 seconds. 7 tags generated.
+2025-03-12 22:43:01,502 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\portman_road13.jpg in 0.03 seconds. 7 tags generated.
+2025-03-12 22:43:01,547 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\portman_road14.jpg in 0.03 seconds. 7 tags generated.
+2025-03-12 22:43:01,591 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\portman_road15.jpg in 0.03 seconds. 7 tags generated.
+2025-03-12 22:43:01,639 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\portman_road16.jpg in 0.03 seconds. 7 tags generated.
+2025-03-12 22:43:01,689 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\selhurst_park13.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:43:01,765 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\selhurst_park14.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:43:01,843 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\selhurst_park15.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:43:01,918 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\selhurst_park16.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:43:01,993 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\selhurst_park17.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:43:02,073 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\selhurst_park18.jpg in 0.07 seconds. 7 tags generated.
+2025-03-12 22:43:02,276 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\selhurst_park19.jpg in 0.19 seconds. 7 tags generated.
+2025-03-12 22:43:02,351 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\selhurst_park20.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:43:02,426 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\selhurst_park21.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:43:02,501 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\selhurst_park22.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:43:02,575 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\selhurst_park23.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:43:02,653 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\selhurst_park24.jpg in 0.07 seconds. 7 tags generated.
+2025-03-12 22:43:02,725 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\selhurst_park25.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:43:02,828 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\selhurst_park27 (1).jpg in 0.09 seconds. 7 tags generated.
+2025-03-12 22:43:02,899 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\selhurst_park27.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:43:02,974 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\brentford_community_stadium01.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:43:03,044 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\brentford_community_stadium02.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:43:03,118 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\brentford_community_stadium03.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:43:03,192 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\brentford_community_stadium04.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:43:03,255 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\city_ground01.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:43:03,310 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\city_ground02.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:43:03,354 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\city_ground03.jpg in 0.03 seconds. 7 tags generated.
+2025-03-12 22:43:03,407 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\city_ground04 (1).jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:43:03,459 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\city_ground04.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:43:03,520 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\city_ground05.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:43:03,581 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\city_ground06.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:43:03,641 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\city_ground07.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:43:03,702 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\city_ground08.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:43:03,763 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\city_ground09.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:43:03,820 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\city_ground10.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:43:03,875 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\city_ground14.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:43:03,926 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\city_ground15.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:43:03,978 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\city_ground16.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:43:04,031 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\city_ground17.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:43:04,084 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\city_ground18.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:43:04,136 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\city_ground19.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:43:04,188 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\city_ground20.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:43:04,241 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\city_ground21.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:43:04,289 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\city_ground22.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:43:04,348 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\city_ground23.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:43:04,405 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\city_ground24.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:43:04,460 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\craven_cottage01.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:43:04,517 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\craven_cottage02.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:43:04,572 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\craven_cottage03.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:43:04,630 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\craven_cottage04.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:43:04,686 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\craven_cottage05.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:43:04,736 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\craven_cottage06.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:43:04,788 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\craven_cottage07.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:43:04,843 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\craven_cottage08.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:43:04,898 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\craven_cottage09.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:43:04,955 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\craven_cottage10.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:43:05,011 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\craven_cottage11.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:43:05,066 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\craven_cottage12.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:43:05,118 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\craven_cottage13.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:43:05,177 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\craven_cottage14.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:43:05,231 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\craven_cottage15.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:43:05,285 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\craven_cottage16.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:43:05,341 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\craven_cottage17.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:43:05,395 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\craven_cottage18.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:43:05,446 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\craven_cottage19.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:43:05,507 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\craven_cottage20.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:43:05,558 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\craven_cottage21.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:43:05,607 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\craven_cottage22.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:43:05,662 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\craven_cottage23.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:43:05,715 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\craven_cottage24.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:43:05,766 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\craven_cottage25.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:43:05,818 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\falmer_stadium01.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:43:05,872 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\falmer_stadium02.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:43:05,924 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\falmer_stadium03.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:43:05,978 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\falmer_stadium11.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:43:06,038 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\falmer_stadium12.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:43:06,097 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\falmer_stadium13.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:43:06,155 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\falmer_stadium14.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:43:06,211 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\falmer_stadium15.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:43:06,270 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\falmer_stadium16.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:43:06,345 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\falmer_stadium18.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:43:06,410 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\falmer_stadium19.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:43:06,468 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\falmer_stadium20.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:43:06,530 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\falmer_stadium21.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:43:06,584 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\falmer_stadium22.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:43:06,654 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\falmer_stadium23.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:43:06,727 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\falmer_stadium24.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:43:06,806 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\falmer_stadium25.jpg in 0.07 seconds. 7 tags generated.
+2025-03-12 22:43:06,882 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\falmer_stadium26.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:43:06,961 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\falmer_stadium27.jpg in 0.07 seconds. 7 tags generated.
+2025-03-12 22:43:07,034 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\falmer_stadium28.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:43:07,109 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\falmer_stadium29.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:43:07,186 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\falmer_stadium30.jpg in 0.07 seconds. 7 tags generated.
+2025-03-12 22:43:07,259 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\falmer_stadium31.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:43:07,335 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\falmer_stadium32.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:43:07,407 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\falmer_stadium33.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:43:07,483 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\falmer_stadium34.jpg in 0.07 seconds. 7 tags generated.
+2025-03-12 22:43:07,550 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\falmer_stadium35.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:43:07,622 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\falmer_stadium36.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:43:07,687 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\falmer_stadium37.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:43:07,754 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\falmer_stadium38.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:43:07,805 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\molineux_stadium01.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:43:07,858 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\molineux_stadium02.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:43:07,922 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\molineux_stadium03.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:43:07,984 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\molineux_stadium04.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:43:08,047 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\molineux_stadium05.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:43:08,106 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\molineux_stadium06.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:43:08,181 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\molineux_stadium07.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:43:08,253 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\molineux_stadium08.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:43:08,328 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\molineux_stadium11.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:43:08,406 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\molineux_stadium12.jpg in 0.07 seconds. 7 tags generated.
+2025-03-12 22:43:08,490 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\molineux_stadium13.jpg in 0.07 seconds. 7 tags generated.
+2025-03-12 22:43:08,564 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\molineux_stadium14.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:43:08,644 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\molineux_stadium15.jpg in 0.07 seconds. 7 tags generated.
+2025-03-12 22:43:08,721 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\molineux_stadium16.jpg in 0.07 seconds. 7 tags generated.
+2025-03-12 22:43:08,809 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\molineux_stadium17.jpg in 0.07 seconds. 7 tags generated.
+2025-03-12 22:43:08,886 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\molineux_stadium20.jpg in 0.07 seconds. 7 tags generated.
+2025-03-12 22:43:08,968 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\molineux_stadium21.jpg in 0.07 seconds. 7 tags generated.
+2025-03-12 22:43:09,045 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\molineux_stadium22.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:43:09,118 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\molineux_stadium23.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:43:09,196 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\molineux_stadium24.jpg in 0.07 seconds. 7 tags generated.
+2025-03-12 22:43:09,270 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\molineux_stadium25.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:43:09,346 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\molineux_stadium26.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:43:09,412 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\molineux_stadium27.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:43:09,484 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\molineux_stadium28.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:43:09,553 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\molineux_stadium29.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:43:09,631 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\molineux_stadium30.jpg in 0.07 seconds. 7 tags generated.
+2025-03-12 22:43:09,702 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\molineux_stadium31.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:43:09,774 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\molineux_stadium32.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:43:09,834 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\molineux_stadium33.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:43:09,909 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\molineux_stadium34.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:43:09,953 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\portman_road01.jpg in 0.03 seconds. 7 tags generated.
+2025-03-12 22:43:10,000 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\portman_road02.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:43:10,042 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\portman_road03.jpg in 0.03 seconds. 7 tags generated.
+2025-03-12 22:43:10,088 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\portman_road04.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:43:10,133 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\portman_road05.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:43:10,178 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\portman_road06.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:43:10,224 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\portman_road07.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:43:10,269 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\portman_road08.jpg in 0.03 seconds. 7 tags generated.
+2025-03-12 22:43:10,315 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\portman_road09.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:43:10,363 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\portman_road10.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:43:10,404 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\portman_road11.jpg in 0.03 seconds. 7 tags generated.
+2025-03-12 22:43:10,447 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\portman_road12.jpg in 0.03 seconds. 7 tags generated.
+2025-03-12 22:43:10,492 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\portman_road13.jpg in 0.03 seconds. 7 tags generated.
+2025-03-12 22:43:10,547 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\portman_road14.jpg in 0.03 seconds. 7 tags generated.
+2025-03-12 22:43:10,591 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\portman_road15.jpg in 0.03 seconds. 7 tags generated.
+2025-03-12 22:43:10,644 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\portman_road16.jpg in 0.04 seconds. 7 tags generated.
+2025-03-12 22:43:10,707 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\selhurst_park13.jpg in 0.05 seconds. 7 tags generated.
+2025-03-12 22:43:10,786 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\selhurst_park14.jpg in 0.07 seconds. 7 tags generated.
+2025-03-12 22:43:10,862 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\selhurst_park15.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:43:10,939 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\selhurst_park16.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:43:11,013 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\selhurst_park17.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:43:11,094 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\selhurst_park18.jpg in 0.07 seconds. 7 tags generated.
+2025-03-12 22:43:11,173 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\selhurst_park19.jpg in 0.07 seconds. 7 tags generated.
+2025-03-12 22:43:11,245 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\selhurst_park20.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:43:11,321 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\selhurst_park21.jpg in 0.07 seconds. 7 tags generated.
+2025-03-12 22:43:11,398 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\selhurst_park22.jpg in 0.07 seconds. 7 tags generated.
+2025-03-12 22:43:11,474 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\selhurst_park23.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:43:11,552 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\selhurst_park24.jpg in 0.07 seconds. 7 tags generated.
+2025-03-12 22:43:11,633 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\selhurst_park25.jpg in 0.07 seconds. 7 tags generated.
+2025-03-12 22:43:11,711 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\selhurst_park27 (1).jpg in 0.07 seconds. 7 tags generated.
+2025-03-12 22:43:11,782 - INFO - Features extracted for C:\Users\alexa\dev\AiR-Helix-View\backend\..\frontend\public\images\selhurst_park27.jpg in 0.06 seconds. 7 tags generated.
+2025-03-12 22:43:11,793 - INFO - Features extracted for 284 new images
+2025-03-12 22:43:12,524 - INFO - Retrieved embeddings for 1820 existing images
+2025-03-12 23:01:50,099 - INFO - Database update complete. Added 284 new images with 266985 new relationships
+2025-03-12 23:01:50,110 - INFO - ==================================================
+2025-03-12 23:01:50,111 - INFO - DATABASE UPDATE COMPLETE
+2025-03-12 23:01:50,111 - INFO - ==================================================
+2025-03-12 23:01:50,111 - INFO - Initial image count: 1820
+2025-03-12 23:01:50,111 - INFO - New images added: 284
+2025-03-12 23:01:50,111 - INFO - Failed to add: 0
+2025-03-12 23:01:50,112 - INFO - Final image count: 1962
+2025-03-12 23:01:50,112 - INFO - New relationships created: 266985
+2025-03-12 23:01:50,112 - INFO - Total time: 1194.81 seconds
