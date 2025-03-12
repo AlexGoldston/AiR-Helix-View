@@ -161,3 +161,51 @@ def simple_db_status():
             "status": "error",
             "message": str(e)
         }), 500
+
+@simple_admin_bp.route('/simple-admin/update-db', methods=['POST'])
+def simple_update_db():
+    """Update the database with new images without resetting"""
+    try:
+        if not os.path.exists(IMAGES_DIR):
+            return jsonify({
+                "status": "error",
+                "message": f"Images directory not found: {IMAGES_DIR}"
+            }), 404
+            
+        # Get update_graph function
+        try:
+            from graph import update_graph
+        except ImportError:
+            logger.error("Could not import update_graph function")
+            return jsonify({
+                "status": "error",
+                "message": "Could not import update_graph function"
+            }), 500
+            
+        # Update the graph using default settings
+        logger.info(f"Starting database update from {IMAGES_DIR}")
+        success, stats = update_graph(IMAGES_DIR, 
+                                      similarity_threshold=0.35,
+                                      generate_descriptions=True,
+                                      use_ml_descriptions=True)
+        
+        if success:
+            return jsonify({
+                "status": "success",
+                "message": f"Database updated successfully. Added {stats.get('added_count', 0)} new images with {stats.get('new_relationships', 0)} new relationships",
+                "stats": stats
+            })
+        else:
+            return jsonify({
+                "status": "error",
+                "message": stats.get("error", "Unknown error during database update"),
+                "stats": stats
+            }), 500
+            
+    except Exception as e:
+        logger.error(f"Error updating database: {e}")
+        logger.error(traceback.format_exc())
+        return jsonify({
+            "status": "error",
+            "message": str(e)
+        }), 500

@@ -10,7 +10,7 @@ import logging
 from utils.db_performance import track_query_performance
 import traceback  # Added for better error logging
 from tqdm import tqdm  # For progress tracking
-from utils.feature_extraction import ImageFeatureExtractor, batch_extract_features
+from utils.feature_extraction import ImageFeatureExtractor
 import json
 import math
 
@@ -1304,6 +1304,324 @@ def populate_graph(image_dir, similarity_threshold=0.35, generate_descriptions=T
     db.close()
     
     return True
+
+def update_graph(image_dir, similarity_threshold=0.35, generate_descriptions=True, use_ml_descriptions=True, force_gpu=False):
+    """
+    Update the Neo4j graph database with new images without rebuilding the entire database
+    
+    Args:
+        image_dir (str): Directory containing images to add
+        similarity_threshold (float): Minimum similarity to create a relationship
+        generate_descriptions (bool): Whether to generate descriptions for images
+        use_ml_descriptions (bool): Whether to use ML-based descriptions when available
+        force_gpu (bool): Whether to force GPU usage for descriptions if available
+    
+    Returns:
+        tuple: (success, stats) where success is a boolean and stats is a dictionary with update metrics
+    """
+    logger.info(f"Starting incremental graph update from {image_dir}")
+    logger.info(f"Similarity threshold: {similarity_threshold}")
+    logger.info(f"Generate descriptions: {generate_descriptions}")
+    logger.info(f"Use ML descriptions: {use_ml_descriptions}")
+    
+    # Validate image directory
+    if not os.path.exists(image_dir):
+        logger.error(f"Image directory does not exist: {image_dir}")
+        return False, {"error": "Image directory not found"}
+    
+    # Initialize embedder and database connection
+    try:
+        embedder = ImageEmbedder()
+        db = Neo4jConnection()
+        
+        # Initialize description generator if needed
+        description_generator = None
+        if generate_descriptions:
+            try:
+                from utils.image_description import get_description_generator
+                description_generator = get_description_generator(use_ml=use_ml_descriptions, force_gpu=force_gpu)
+                logger.info(f"Using {'ML-based' if use_ml_descriptions else 'basic'} description generator")
+            except Exception as e:
+                logger.warning(f"Failed to initialize description generator: {e}")
+                logger.warning(traceback.format_exc())
+                description_generator = None
+    except Exception as e:
+        logger.error(f"Failed to initialize embedder or database: {e}")
+        logger.error(traceback.format_exc())
+        return False, {"error": f"Initialization failed: {str(e)}"}
+    
+    # Get existing images from database
+    try:
+        existing_images = set(db.get_all_images())
+        logger.info(f"Found {len(existing_images)} existing images in database")
+    except Exception as e:
+        logger.error(f"Failed to get existing images: {e}")
+        return False, {"error": f"Database query failed: {str(e)}"}
+    
+    # Find all image files in the directory
+    image_paths = []
+    for ext in ['*.jpg', '*.jpeg', '*.png', '*.gif']:
+        image_paths.extend(glob.glob(os.path.join(image_dir, ext)))
+        image_paths.extend(glob.glob(os.path.join(image_dir, ext.upper())))
+    
+    logger.info(f"Found {len(image_paths)} images in directory")
+    
+    # Identify new images (not in the database)
+    new_image_paths = []
+    for path in image_paths:
+        filename = normalize_image_path(path)
+        if filename not in existing_images:
+            new_image_paths.append(path)
+    
+    logger.info(f"Found {len(new_image_paths)} new images to add")
+    
+    if not new_image_paths:
+        logger.info("No new images to add")
+        return True, {"added": 0, "existing": len(existing_images), "message": "No new images found"}
+    
+    # Process and store new image embeddings
+    embeddings = {}
+    descriptions = {}
+    successful_nodes = 0
+    failed_nodes = 0
+    
+    # First pass: generate embeddings for new images
+    for image_path in tqdm(new_image_paths, desc="Generating embeddings"):
+        try:
+            # Get just the filename
+            filename = normalize_image_path(image_path)
+            
+            # Generate embedding
+            embedding = embedder.get_embedding(image_path)
+            
+            if embedding is not None:
+                embeddings[filename] = embedding
+                successful_nodes += 1
+            else:
+                failed_nodes += 1
+                logger.warning(f"Failed to generate embedding for {filename}")
+        except Exception as e:
+            failed_nodes += 1
+            logger.error(f"Error processing {image_path}: {e}")
+            logger.error(traceback.format_exc())
+    
+    logger.info(f"Embeddings generated: {successful_nodes} successful, {failed_nodes} failed")
+    
+    # Second pass: generate descriptions for new images
+    if generate_descriptions and description_generator:
+        if hasattr(description_generator, 'generate_descriptions_batch') and not callable(description_generator):
+            # Use batch processing for ML-based descriptions
+            logger.info("Using batch processing for descriptions")
+            
+            # Get paths for images that have embeddings
+            valid_image_paths = []
+            path_to_filename = {}
+            
+            for image_path in new_image_paths:
+                filename = normalize_image_path(image_path)
+                if filename in embeddings:
+                    valid_image_paths.append(image_path)
+                    path_to_filename[image_path] = filename
+            
+            # Define optimal batch size
+            batch_size = 8  # Adjust based on GPU memory
+            
+            try:
+                # Generate descriptions in batches
+                batch_results = description_generator.generate_descriptions_batch(
+                    valid_image_paths, 
+                    batch_size=batch_size,
+                    max_length=50
+                )
+                
+                # Convert to our format (filename -> description)
+                for full_path, desc in batch_results.items():
+                    filename = path_to_filename.get(full_path) or normalize_image_path(full_path)
+                    if filename and desc:
+                        descriptions[filename] = desc
+                
+                logger.info(f"Generated {len(descriptions)} descriptions using batch processing")
+                
+            except Exception as batch_error:
+                logger.error(f"Batch description generation failed: {batch_error}")
+                logger.error(traceback.format_exc())
+                logger.warning("Falling back to individual processing")
+                
+                # Fallback to individual processing
+                for image_path in tqdm(valid_image_paths, desc="Generating descriptions (fallback)"):
+                    try:
+                        filename = normalize_image_path(image_path)
+                        
+                        # Generate description
+                        if callable(description_generator):
+                            description = description_generator(image_path)
+                        else:
+                            description = description_generator.generate_description(image_path)
+                        
+                        if description:
+                            descriptions[filename] = description
+                    except Exception as e:
+                        logger.error(f"Error generating description for {filename}: {e}")
+        else:
+            # Process descriptions individually
+            logger.info("Using individual processing for descriptions")
+            
+            for image_path in tqdm(new_image_paths, desc="Generating descriptions"):
+                try:
+                    filename = normalize_image_path(image_path)
+                    
+                    # Skip if embedding generation failed
+                    if filename not in embeddings:
+                        continue
+                    
+                    # Generate description
+                    if callable(description_generator):
+                        description = description_generator(image_path)
+                    else:
+                        description = description_generator.generate_description(image_path)
+                    
+                    if description:
+                        descriptions[filename] = description
+                except Exception as e:
+                    logger.error(f"Error generating description for {filename}: {e}")
+    
+    logger.info(f"Descriptions generated: {len(descriptions)}")
+    
+    # Third pass: create nodes for new images
+    for filename, embedding in tqdm(embeddings.items(), desc="Creating nodes"):
+        try:
+            # Get description if available
+            description = descriptions.get(filename)
+            db.create_image_node(filename, embedding, description)
+        except Exception as e:
+            logger.error(f"Failed to create node for {filename}: {e}")
+    
+    # Extract features for new images
+    if generate_descriptions:
+        logger.info("Extracting and storing image features for new images...")
+        try:
+            # We need to modify the extract_and_store_features function to handle only specific images
+            # For now, let's process all images in the directory but only store for new ones
+            batch_size = 10
+            extractor = ImageFeatureExtractor(use_ml_features=True)
+            processed_count = 0
+            
+            for image_path in tqdm(new_image_paths, desc="Extracting features"):
+                try:
+                    filename = normalize_image_path(image_path)
+                    
+                    # Skip if not in our embeddings list
+                    if filename not in embeddings:
+                        continue
+                    
+                    # Extract features
+                    features = extractor.extract_features(image_path)
+                    
+                    if features:
+                        db.store_image_features(filename, features)
+                        processed_count += 1
+                except Exception as e:
+                    logger.error(f"Error extracting features for {image_path}: {e}")
+                    
+            logger.info(f"Features extracted for {processed_count} new images")
+        except Exception as e:
+            logger.error(f"Error during feature extraction: {e}")
+            logger.error(traceback.format_exc())
+    
+    # Fourth pass: create similarity relationships
+    # We need to calculate similarity between:
+    # 1. New images and existing images
+    # 2. New images and other new images
+    
+    # First, get embeddings for existing images
+    existing_embeddings = {}
+    try:
+        with db.driver.session() as session:
+            result = session.run(
+                """
+                MATCH (i:Image)
+                WHERE i.path IN $paths
+                RETURN i.path AS path, i.embedding AS embedding
+                """,
+                paths=list(existing_images)
+            )
+            
+            for record in result:
+                path = record["path"]
+                embedding = record["embedding"]
+                if path and embedding:
+                    existing_embeddings[path] = embedding
+                    
+        logger.info(f"Retrieved embeddings for {len(existing_embeddings)} existing images")
+    except Exception as e:
+        logger.error(f"Failed to retrieve existing embeddings: {e}")
+        logger.error(traceback.format_exc())
+    
+    # Now calculate similarities and create relationships
+    relationship_count = 0
+    
+    # Setup progress tracking
+    total_comparisons = (len(embeddings) * (len(embeddings) - 1)) // 2  # New with new
+    total_comparisons += len(embeddings) * len(existing_embeddings)     # New with existing
+    
+    with tqdm(total=total_comparisons, desc="Creating relationships") as pbar:
+        # New images with each other
+        new_filenames = list(embeddings.keys())
+        for i, filename1 in enumerate(new_filenames):
+            for filename2 in new_filenames[i+1:]:
+                try:
+                    # Calculate similarity
+                    similarity = calculate_cosine_similarity(
+                        embeddings[filename1], 
+                        embeddings[filename2]
+                    )
+                    
+                    # Create relationship if above threshold
+                    if similarity >= similarity_threshold:
+                        db.create_similarity_relationship(filename1, filename2, similarity)
+                        relationship_count += 1
+                except Exception as e:
+                    logger.error(f"Error creating similarity between {filename1} and {filename2}: {e}")
+                
+                pbar.update(1)
+        
+        # New images with existing images
+        for new_file, new_embedding in embeddings.items():
+            for existing_file, existing_embedding in existing_embeddings.items():
+                try:
+                    # Calculate similarity
+                    similarity = calculate_cosine_similarity(
+                        new_embedding, 
+                        existing_embedding
+                    )
+                    
+                    # Create relationship if above threshold
+                    if similarity >= similarity_threshold:
+                        db.create_similarity_relationship(new_file, existing_file, similarity)
+                        relationship_count += 1
+                except Exception as e:
+                    logger.error(f"Error creating similarity between {new_file} and {existing_file}: {e}")
+                
+                pbar.update(1)
+    
+    # Calculate final stats
+    final_count = db.count_images()
+    added_count = successful_nodes - failed_nodes
+    
+    stats = {
+        "initial_count": len(existing_images),
+        "added_count": added_count,
+        "failed_count": failed_nodes,
+        "final_count": final_count,
+        "new_relationships": relationship_count
+    }
+    
+    logger.info(f"Database update complete. Added {added_count} new images with {relationship_count} new relationships")
+    
+    # Close database connection
+    db.close()
+    
+    return True, stats
 
 if __name__ == '__main__':
     # For manual testing

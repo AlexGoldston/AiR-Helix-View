@@ -566,3 +566,4 @@ def search_by_object():
         "results": formatted_results,
         "count": len(formatted_results)
     })
+

@@ -1,6 +1,3 @@
-#!/usr/bin/env python
-# update_database_gpu.py
-
 import os
 import sys
 import logging

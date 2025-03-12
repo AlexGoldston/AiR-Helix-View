@@ -410,3 +410,61 @@ def debug_db():
             "connection": "ERROR",
             "error": str(e)
         })
+
+@admin_bp.route('/admin/update-db', methods=['POST'])
+def update_db():
+    """Update the database with new images without resetting"""
+    try:
+        # Get parameters
+        images_dir = request.json.get('images_dir') if request.is_json else request.form.get('images_dir')
+        similarity_threshold = float(request.json.get('threshold', 0.35) if request.is_json else request.form.get('threshold', 0.35))
+        generate_descriptions = request.json.get('generate_descriptions', True) if request.is_json else request.form.get('generate_descriptions', 'true').lower() == 'true'
+        use_ml = request.json.get('use_ml', True) if request.is_json else request.form.get('use_ml', 'true').lower() == 'true'
+        
+        # Default to configured IMAGES_DIR if not specified
+        if not images_dir:
+            images_dir = IMAGES_DIR
+            
+        if not os.path.exists(images_dir):
+            return jsonify({
+                "status": "error",
+                "message": f"Images directory not found: {images_dir}"
+            }), 404
+            
+        # Get update_graph function
+        try:
+            from graph import update_graph
+        except ImportError:
+            logger.error("Could not import update_graph function")
+            return jsonify({
+                "status": "error",
+                "message": "Could not import update_graph function"
+            }), 500
+            
+        # Update the graph
+        logger.info(f"Starting database update from {images_dir}")
+        success, stats = update_graph(images_dir, 
+                                     similarity_threshold=similarity_threshold,
+                                     generate_descriptions=generate_descriptions,
+                                     use_ml_descriptions=use_ml)
+        
+        if success:
+            return jsonify({
+                "status": "success",
+                "message": f"Database updated successfully. Added {stats['added_count']} new images with {stats['new_relationships']} new relationships",
+                "stats": stats
+            })
+        else:
+            return jsonify({
+                "status": "error",
+                "message": stats.get("error", "Unknown error during database update"),
+                "stats": stats
+            }), 500
+            
+    except Exception as e:
+        logger.error(f"Error updating database: {e}")
+        logger.error(traceback.format_exc())
+        return jsonify({
+            "status": "error",
+            "message": str(e)
+        }), 500
