@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import ForceGraph2D from 'react-force-graph-2d';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './components/ui/dialog';
-import { Info, ZoomIn, ZoomOut, Download, X, Filter } from 'lucide-react';
+import { Info, ZoomIn, ZoomOut, Download, X, Filter, Search } from 'lucide-react';
 import { Button } from './components/ui/button';
 import { Slider } from './components/ui/slider';
 import TagFilter from './components/TagFilter';
+import KeywordSearch from './components/KeywordSearch';
 import _ from 'lodash';
 
 const ImageSimilarityExplorer = () => {
@@ -31,7 +32,10 @@ const ImageSimilarityExplorer = () => {
   const [filteredNodes, setFilteredNodes] = useState(new Set());
   const [isFiltering, setIsFiltering] = useState(false);
   const [filterTags, setFilterTags] = useState([]);
-    
+  const [searchKeyword, setSearchKeyword] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
+  const [showSearchPanel, setShowSearchPanel] = useState(false);
+      
   // Refs
   const imagesCache = useRef({});
   const graphRef = useRef(null);
@@ -46,7 +50,6 @@ const ImageSimilarityExplorer = () => {
   const getImageName = useCallback((path) => {
     if (!path) return 'unknown';
     
-    // Create a function to clean the path consistently
     const cleanPath = (inputPath) => {
       // Remove any "images/" prefix
       let filename = inputPath;
@@ -482,7 +485,7 @@ useEffect(() => {
   }
 }, [isAutoLoadingEnabled, processLoadQueue]);
 
-//click tracking cleanup
+// click tracking cleanup
 useEffect(() => {
   return () => {
     if (clickTimerRef.current) {
@@ -556,7 +559,7 @@ const handleSetAsCenterImage = useCallback(() => {
   }
 }, [selectedNode]);
 
-// Helper function to get similarity value for a node
+// helper function to get similarity value for a node
 const getSimilarity = useCallback((node, data) => {
   if (node.isCenter) return 1;
   
@@ -570,14 +573,14 @@ const getSimilarity = useCallback((node, data) => {
   return link ? link.value : null;
 }, []);
 
-// Reset zoom function
+// reset zoom function
 const handleResetZoom = useCallback(() => {
   if (graphRef.current) {
     graphRef.current.zoomToFit(500);
   }
 }, []);
 
-// Zoom in function
+// zoom in function
 const handleZoomIn = useCallback(() => {
   if (graphRef.current) {
     const currentZoom = graphRef.current.zoom();
@@ -585,7 +588,7 @@ const handleZoomIn = useCallback(() => {
   }
 }, []);
 
-// Zoom out function
+// zoom out function
 const handleZoomOut = useCallback(() => {
   if (graphRef.current) {
     const currentZoom = graphRef.current.zoom();
@@ -593,7 +596,7 @@ const handleZoomOut = useCallback(() => {
   }
 }, []);
 
-// Reset expanded nodes
+// reset expanded nodes
 const clearGraph = useCallback(() => {
   setExpandedNodes(new Set());
   loadQueue.current = [];
@@ -607,19 +610,19 @@ const clearGraph = useCallback(() => {
   }
 }, [graphData.nodes]);
 
-// Reset view to center
+// reset view to center
 const resetView = useCallback(() => {
   if (graphRef.current) {
     graphRef.current.zoomToFit(400);
   }
 }, []);
 
-// Toggle automatic loading
+// toggle automatic loading
 const toggleAutomaticLoading = useCallback(() => {
   setIsAutoLoadingEnabled(prev => !prev);
 }, []);
 
-// Get a short description from the center node
+// get short description from the center node
 const getCenterNodeDescription = useCallback(() => {
   const centerNode = graphData.nodes.find(node => node.isCenter);
   if (centerNode && centerNode.description) {
@@ -631,7 +634,7 @@ const getCenterNodeDescription = useCallback(() => {
   return "No description available";
 }, [graphData.nodes]);
 
-// Add a function to truncate descriptions
+// truncate descriptions
 const truncateDescription = (desc, maxLength = 60) => {
   if (!desc) return 'No description available';
   return desc.length > maxLength 
@@ -671,9 +674,12 @@ const drawFallbackNode = (node, ctx, width, height, borderColor, globalScale) =>
 // filter using tags
 useEffect(() => {
   if (!filterTags.length) {
-    // If no filter tags, clear filtering
-    setFilteredNodes(new Set());
-    setIsFiltering(false);
+    // If no filter tags, clear tag filtering
+    // But keep keyword filter if active
+    if (!searchKeyword) {
+      setFilteredNodes(new Set());
+      setIsFiltering(false);
+    }
     return;
   }
   
@@ -728,6 +734,89 @@ useEffect(() => {
   
 }, [filterTags, graphData.nodes]);
 
+// Keyword search handler
+const handleKeywordSearch = useCallback(async (keyword) => {
+  if (!keyword) {
+    // Clear search filter if no keyword
+    if (!filterTags.length) {
+      setIsFiltering(false);
+      setFilteredNodes(new Set());
+    }
+    setSearchKeyword('');
+    return;
+  }
+
+  setIsSearching(true);
+  setSearchKeyword(keyword);
+  
+  try {
+    // Set filtering flag
+    setIsFiltering(true);
+
+    // Create a new set for nodes that match the keyword
+    const matchingNodeIds = new Set();
+    
+    // Always include center node
+    const centerNode = graphData.nodes.find(n => n.isCenter);
+    if (centerNode) {
+      matchingNodeIds.add(centerNode.id);
+    }
+    
+    // Do a local search through nodes - better performance than API call
+    const lowercaseKeyword = keyword.toLowerCase();
+    graphData.nodes.forEach(node => {
+      const fileName = getImageName(node.path).toLowerCase();
+      const description = (node.description || '').toLowerCase();
+      
+      // Check if keyword is in filename or description
+      if (fileName.includes(lowercaseKeyword) || description.includes(lowercaseKeyword)) {
+        matchingNodeIds.add(node.id);
+      }
+    });
+    
+    // If we also have tag filters, we need to intersect the sets
+    if (filterTags.length > 0) {
+      const currentFiltered = new Set(filteredNodes);
+      const newFiltered = new Set();
+      
+      // Only keep nodes that are in both sets
+      matchingNodeIds.forEach(id => {
+        if (currentFiltered.has(id)) {
+          newFiltered.add(id);
+        }
+      });
+      
+      // Also ensure center node is always included
+      if (centerNode) {
+        newFiltered.add(centerNode.id);
+      }
+      
+      setFilteredNodes(newFiltered);
+    } else {
+      setFilteredNodes(matchingNodeIds);
+    }
+  } catch (error) {
+    console.error('Error performing keyword search:', error);
+  } finally {
+    setIsSearching(false);
+  }
+}, [filterTags, filteredNodes, getImageName, graphData.nodes]);
+
+// Clear search
+const handleClearSearch = useCallback(() => {
+  setSearchKeyword('');
+  
+  // If no other filters are active, clear filtering completely
+  if (!filterTags.length) {
+    setIsFiltering(false);
+    setFilteredNodes(new Set());
+  } else {
+    // Otherwise, re-apply just the tag filters
+    // This will trigger the tag filter effect which will update filteredNodes
+    setFilterTags([...filterTags]);
+  }
+}, [filterTags]);
+
 // tag filter apply handler
 const handleApplyFilters = (selectedTags) => {
   setFilterTags(selectedTags);
@@ -736,6 +825,15 @@ const handleApplyFilters = (selectedTags) => {
 // tag filter clear handler
 const handleClearFilters = () => {
   setFilterTags([]);
+  
+  // If search is also not active, clear all filtering
+  if (!searchKeyword) {
+    setIsFiltering(false);
+    setFilteredNodes(new Set());
+  } else {
+    // Otherwise re-apply just the keyword search
+    handleKeywordSearch(searchKeyword);
+  }
 };
 
 return (
@@ -782,18 +880,47 @@ return (
       </svg>
     </div>
 
-    {/* Simple Title Banner */}
+    {/* Title Banner with Search and Tag Controls */}
     <div className="z-10 flex items-center justify-between p-4 bg-gray-950/80 backdrop-blur-sm border-b border-gray-800">
       <h1 className="text-xl font-bold bg-gradient-to-r from-blue-500 to-teal-400 bg-clip-text text-transparent">
         AiR-Helix-View
       </h1>
       
-      {/* Tag Filter Button */}
-      <TagFilter 
-        onApplyFilters={handleApplyFilters}
-        onClearFilters={handleClearFilters}
-      />
+      <div className="flex items-center space-x-2">
+        {/* Keyword Search - togglable panel */}
+        <Button 
+          variant={searchKeyword ? "default" : "outline"}
+          size="sm"
+          className="flex items-center"
+          onClick={() => setShowSearchPanel(!showSearchPanel)}
+        >
+          <Search className="h-4 w-4 mr-1" />
+          {searchKeyword ? `"${searchKeyword}"` : "Search"}
+        </Button>
+        
+        {/* Tag Filter */}
+        <TagFilter 
+          onApplyFilters={handleApplyFilters}
+          onClearFilters={handleClearFilters}
+        />
+      </div>
     </div>
+
+    {/* Search Panel - shows when activated */}
+    {showSearchPanel && (
+      <div className="z-10 p-3 bg-gray-900/90 backdrop-blur-sm border-b border-gray-800">
+        <div className="max-w-2xl mx-auto">
+          <KeywordSearch 
+            onSearch={handleKeywordSearch}
+            onClear={handleClearSearch}
+            isSearchActive={!!searchKeyword}
+          />
+          <div className="text-xs text-gray-400 mt-1">
+            Search for images by filename, description content, or visual elements
+          </div>
+        </div>
+      </div>
+    )}
 
     {/* Main Content */}
     <div className="flex-1 relative z-10">
@@ -1044,17 +1171,27 @@ return (
           </div>
         )}
 
-        {/* Tag Filtering Status Indicator */}
+        {/* Tag & Keyword Filtering Status Indicator */}
         {isFiltering && (
-          <div className="absolute top-16 left-4 bg-blue-900/80 backdrop-blur-sm p-2 rounded shadow-lg z-20">
+          <div className="absolute top-24 left-4 bg-blue-900/80 backdrop-blur-sm p-2 rounded shadow-lg z-20">
             <div className="flex items-center text-sm">
               <Filter className="h-4 w-4 mr-1" />
-              <span>Filtering: {filteredNodes.size} nodes match</span>
+              <span>
+                {searchKeyword && filterTags.length 
+                  ? `Filtering by "${searchKeyword}" AND ${filterTags.length} tags` 
+                  : searchKeyword 
+                    ? `Filtering by "${searchKeyword}"` 
+                    : `Filtering by ${filterTags.length} tags`}
+                {' '}- {filteredNodes.size} nodes match
+              </span>
               <Button 
                 variant="ghost" 
                 size="sm" 
                 className="ml-2 h-6 w-6 p-0" 
-                onClick={handleClearFilters}
+                onClick={() => {
+                  handleClearSearch();
+                  handleClearFilters();
+                }}
               >
                 <X className="h-4 w-4" />
               </Button>
