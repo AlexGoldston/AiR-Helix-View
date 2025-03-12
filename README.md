@@ -34,8 +34,20 @@ run ```npm start```
 #### KEYWORD filetering implemented
 ![alt text](image-1.png)
 
-##### WORKING ON: incremental graph updates -- 2k db takes ~2hrs to rebuild now on GPU
+##### INCREMENTAL DB UPDATES
+![alt text](image-2.png)
 
+basic run ```python database_update_incremental.py```
+adv run ```python update_database_incremental.py --images-dir "/path/to/new/images" --threshold 0.4 --force-gpu --verbose```
+use these flags:
+```
+--images-dir PATH     Directory containing images to add
+--threshold FLOAT     Similarity threshold (default: 0.35)
+--no-descriptions     Skip generating descriptions for images
+--no-ml               Avoid using ML for descriptions (use basic descriptions only)
+--force-gpu           Force GPU usage for descriptions when available
+--verbose             Enable verbose output
+```
 
 ---
 
