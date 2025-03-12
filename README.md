@@ -37,9 +37,13 @@ run ```npm start```
 ##### INCREMENTAL DB UPDATES
 ![alt text](image-2.png)
 
-basic run ```python database_update_incremental.py```
+basic run example:
 
-adv run ```python update_database_incremental.py --images-dir "/path/to/new/images" --threshold 0.4 --force-gpu --verbose```
+```python database_update_incremental.py```
+
+adv run example:
+
+```python update_database_incremental.py --images-dir "/path/to/new/images" --threshold 0.4 --force-gpu --verbose```
 
 use these flags:
 ```
