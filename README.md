@@ -34,6 +34,8 @@ run ```npm start```
 #### KEYWORD filetering implemented
 ![alt text](image-1.png)
 
+##### WORKING ON: incremental graph updates -- 2k db takes ~2hrs to rebuild now on GPU
+
 
 ---
 
