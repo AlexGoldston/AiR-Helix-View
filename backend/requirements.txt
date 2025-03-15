@@ -1,0 +1,8 @@
+flask
+flask-cors
+neo4j
+sentence-transformers
+pillow
+numpy
+python-dotenv
+tqdm
