@@ -3,7 +3,8 @@ frontend:
   phases:
     preBuild:
       commands:
-        - npm ci  # Clean install of node_modules
+        - cd frontend
+        - npm install  # Changed from npm ci
     build:
       commands:
         - npm run build:production
@@ -13,4 +14,4 @@ frontend:
       - '**/*'
   cache:
     paths:
-      - node_modules/**/*
+      - frontend/node_modules/**/*
