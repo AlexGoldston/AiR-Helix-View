@@ -43,9 +43,17 @@
     ]
   },
   "devDependencies": {
+    "@aws-amplify/backend": "^1.14.3",
+    "@aws-amplify/backend-cli": "^1.5.0",
     "autoprefixer": "^10.4.14",
+    "aws-cdk": "^2.1003.0",
+    "aws-cdk-lib": "^2.180.0",
+    "constructs": "^10.4.2",
     "env-cmd": "^10.1.0",
+    "esbuild": "^0.25.1",
     "postcss": "^8.4.31",
-    "tailwindcss": "^3.4.17"
+    "tailwindcss": "^3.4.17",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.2"
   }
 }
