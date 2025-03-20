@@ -26,7 +26,7 @@ const SearchPanel = ({ onSelectImage }) => {
   useEffect(() => {
     const fetchFeatures = async () => {
       try {
-        const response = await fetch('http://localhost:5001/features');
+        const response = await fetch('${process.env.REACT_APP_API_BASE_URL}/features');
         if (!response.ok) {
           throw new Error(`HTTP error! Status: ${response.status}`);
         }
@@ -50,9 +50,9 @@ const SearchPanel = ({ onSelectImage }) => {
 
       // Different search endpoints depending on search type
       if (activeTab === 'text' && searchQuery.trim()) {
-        url = `http://localhost:5001/search?query=${encodeURIComponent(searchQuery)}&limit=20`;
+        url = `${process.env.REACT_APP_API_BASE_URL}/search?query=${encodeURIComponent(searchQuery)}&limit=20`;
       } else if (activeTab === 'advanced') {
-        url = 'http://localhost:5001/search/advanced?';
+        url = '${process.env.REACT_APP_API_BASE_URL}/search/advanced?';
 
         // Add tags if selected
         if (selectedFeatures.tags.length > 0) {
@@ -393,7 +393,7 @@ const SearchPanel = ({ onSelectImage }) => {
                   onClick={() => handleImageClick(result)}
                 >
                   <img
-                    src={`http://localhost:5001/static/${result.path}`}
+                    src={`${process.env.REACT_APP_API_BASE_URL}/static/${result.path}`}
                     alt={result.path}
                     className="w-full h-24 object-cover rounded-md border border-gray-800 group-hover:border-blue-500 transition-colors"
                     onError={(e) => {
@@ -420,7 +420,7 @@ const SearchPanel = ({ onSelectImage }) => {
             <div className="space-y-4">
               <div className="bg-gray-950 p-2 rounded-lg border border-gray-800">
                 <img
-                  src={`http://localhost:5001/static/${selectedImage.path}`}
+                  src={`${process.env.REACT_APP_API_BASE_URL}/static/${selectedImage.path}`}
                   alt={selectedImage.path}
                   className="w-full rounded-md object-contain max-h-64"
                   onError={(e) => {

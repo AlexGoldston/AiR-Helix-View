@@ -48,7 +48,7 @@ const SimpleNavBar = (props) => {
                 <h3 className="mb-4 text-lg font-medium">Current Image</h3>
                 <div className="bg-gray-900 rounded-lg p-2 mb-4">
                   <img 
-                    src={`http://localhost:5001/static/${getImageName(centerImage)}`}
+                    src={`${process.env.REACT_APP_API_BASE_URL}/static/${getImageName(centerImage)}`}
                     alt={getImageName(centerImage)}
                     className="w-full h-48 object-contain rounded-md border border-gray-800"
                     onError={(e) => {

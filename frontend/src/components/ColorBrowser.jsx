@@ -22,7 +22,7 @@ const ColorBrowser = ({ onSelectImage }) => {
   const fetchColorData = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch('http://localhost:5001/features');
+      const response = await fetch('${process.env.REACT_APP_API_BASE_URL}/features');
       if (!response.ok) {
         throw new Error(`HTTP error! Status: ${response.status}`);
       }
@@ -51,7 +51,7 @@ const ColorBrowser = ({ onSelectImage }) => {
     setSearchResults([]);
     
     try {
-      const response = await fetch(`http://localhost:5001/search/color?color=${encodeURIComponent(color.name)}&limit=30`);
+      const response = await fetch(`${process.env.REACT_APP_API_BASE_URL}/search/color?color=${encodeURIComponent(color.name)}&limit=30`);
       
       if (!response.ok) {
         throw new Error(`HTTP error! Status: ${response.status}`);
@@ -188,7 +188,7 @@ const ColorBrowser = ({ onSelectImage }) => {
                         onClick={() => handleImageClick(result)}
                       >
                         <img
-                          src={`http://localhost:5001/static/${result.path}`}
+                          src={`${process.env.REACT_APP_API_BASE_URL}/static/${result.path}`}
                           alt={result.path}
                           className="w-full h-24 object-cover rounded-md border border-gray-800 group-hover:border-blue-500 transition-colors"
                           onError={(e) => {

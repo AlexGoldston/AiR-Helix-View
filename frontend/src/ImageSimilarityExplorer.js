@@ -72,7 +72,7 @@ const ImageSimilarityExplorer = () => {
     if (!path) return null;
     
     const filename = getImageName(path);
-    return `http://localhost:5001/static/${encodeURIComponent(filename)}`;
+    return `${process.env.REACT_APP_API_BASE_URL}/static/${encodeURIComponent(filename)}`;
   }, [getImageName]);
   
   // image preloading function
@@ -155,7 +155,7 @@ const ImageSimilarityExplorer = () => {
         // Get filename and make API request
         const filename = getImageName(node.path);
         const response = await fetch(
-          `http://localhost:5001/neighbors?image_path=${encodeURIComponent(filename)}&threshold=${similarityThreshold}&limit=${neighborLimit}`
+          `${process.env.REACT_APP_API_BASE_URL}/neighbors?image_path=${encodeURIComponent(filename)}&threshold=${similarityThreshold}&limit=${neighborLimit}`
         );
         
         if (!response.ok) throw new Error(`API error for ${filename}: ${response.status}`);
@@ -350,10 +350,10 @@ useEffect(() => {
       // Choose endpoint and parameters based on mode
       let url;
       if (extendedMode) {
-        url = `http://localhost:5001/extended-neighbors?image_path=${encodeURIComponent(filename)}&threshold=${similarityThreshold}&depth=${neighborDepth}&limit_per_level=${limitPerLevel}&max_nodes=${maxNodesLimit}`;
+        url = `${process.env.REACT_APP_API_BASE_URL}/extended-neighbors?image_path=${encodeURIComponent(filename)}&threshold=${similarityThreshold}&depth=${neighborDepth}&limit_per_level=${limitPerLevel}&max_nodes=${maxNodesLimit}`;
         console.log(`Fetching extended data for ${centerImage} with depth ${neighborDepth}`);
       } else {
-        url = `http://localhost:5001/neighbors?image_path=${encodeURIComponent(filename)}&threshold=${similarityThreshold}&limit=${neighborLimit}`;
+        url = `${process.env.REACT_APP_API_BASE_URL}/neighbors?image_path=${encodeURIComponent(filename)}&threshold=${similarityThreshold}&limit=${neighborLimit}`;
         console.log(`Fetching direct neighbors for ${centerImage}`);
       }
       
@@ -694,7 +694,7 @@ useEffect(() => {
       
       // Make API request
       const response = await fetch(
-        `http://localhost:5001/search/tags?tags=${encodeURIComponent(tagsParam)}&operator=OR&limit=100`
+        `${process.env.REACT_APP_API_BASE_URL}/search/tags?tags=${encodeURIComponent(tagsParam)}&operator=OR&limit=100`
       );
       
       if (!response.ok) {
@@ -1220,7 +1220,7 @@ return (
                 <h4 className="text-sm font-medium mb-2">Current Center Image</h4>
                 <div className="bg-gray-950 p-2 rounded-lg mb-2">
                   <img 
-                    src={`http://localhost:5001/static/${getImageName(centerImage)}`}
+                    src={`${process.env.REACT_APP_API_BASE_URL}/static/${getImageName(centerImage)}`}
                     alt={getImageName(centerImage)}
                     className="w-full h-32 object-contain rounded-md border border-gray-800"
                     onError={(e) => {
@@ -1499,7 +1499,7 @@ return (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-4">
                 <div className="bg-gray-950 p-2 rounded-lg border border-gray-800">
                   <img
-                    src={`http://localhost:5001/static/${getImageName(selectedNode.path)}`}
+                    src={`${process.env.REACT_APP_API_BASE_URL}/static/${getImageName(selectedNode.path)}`}
                     alt={getImageName(selectedNode.path)}
                     className="w-full rounded-md object-contain max-h-64 md:max-h-80"
                     onError={(e) => {
@@ -1545,7 +1545,7 @@ return (
                     )}
                     
                     <a
-                      href={`http://localhost:5001/static/${getImageName(selectedNode.path)}`}
+                      href={`${process.env.REACT_APP_API_BASE_URL}/static/${getImageName(selectedNode.path)}`}
                       download={getImageName(selectedNode.path)}
                       target="_blank"
                       rel="noreferrer"

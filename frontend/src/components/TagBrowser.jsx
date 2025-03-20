@@ -21,7 +21,7 @@ const TagBrowser = ({ onSelectImage }) => {
   const fetchTagData = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch('http://localhost:5001/features');
+      const response = await fetch('${process.env.REACT_APP_API_BASE_URL}/features');
       if (!response.ok) {
         throw new Error(`HTTP error! Status: ${response.status}`);
       }
@@ -107,7 +107,7 @@ const TagBrowser = ({ onSelectImage }) => {
     
     try {
       const tagsParam = selectedTags.join(',');
-      const response = await fetch(`http://localhost:5001/search/tags?tags=${encodeURIComponent(tagsParam)}&operator=OR&limit=50`);
+      const response = await fetch(`${process.env.REACT_APP_API_BASE_URL}/search/tags?tags=${encodeURIComponent(tagsParam)}&operator=OR&limit=50`);
       
       if (!response.ok) {
         throw new Error(`HTTP error! Status: ${response.status}`);
@@ -250,7 +250,7 @@ const TagBrowser = ({ onSelectImage }) => {
                           onClick={() => handleImageClick(result)}
                         >
                           <img
-                            src={`http://localhost:5001/static/${result.path}`}
+                            src={`${process.env.REACT_APP_API_BASE_URL}/static/${result.path}`}
                             alt={result.path}
                             className="w-full h-24 object-cover rounded-md border border-gray-800 group-hover:border-blue-500 transition-colors"
                             onError={(e) => {
