@@ -1,7 +1,7 @@
+# app.py - Keep most of your code but modify it for dual use
 from flask import Flask, send_from_directory
 from flask_cors import CORS
 import os
-# import glob
 import logging
 import traceback
 import sys
@@ -10,21 +10,27 @@ import time
 import signal
 import atexit
 import argparse
-# from concurrent.futures import ThreadPoolExecutor, TimeoutError
 
-# Parse command line arguments
-parser = argparse.ArgumentParser(description='Image Similarity Explorer Backend')
-parser.add_argument('--skip-db-init', action='store_true', 
-                    help='Skip database initialization on startup (faster startup)')
-parser.add_argument('--debug', action='store_true',
-                    help='Run in debug mode (more verbose logging)')
-args = parser.parse_args()
-
-# Configure Rust extension debugging based on debug flag
-if args.debug:
-    os.environ["NEO4J_RUST_EXT_DEBUG"] = "1"
+# Parse command line arguments only when running locally
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='Image Similarity Explorer Backend')
+    parser.add_argument('--skip-db-init', action='store_true', 
+                        help='Skip database initialization on startup (faster startup)')
+    parser.add_argument('--debug', action='store_true',
+                        help='Run in debug mode (more verbose logging)')
+    args = parser.parse_args()
+    
+    # Configure Rust extension debugging based on debug flag
+    if args.debug:
+        os.environ["NEO4J_RUST_EXT_DEBUG"] = "1"
+    else:
+        os.environ["NEO4J_RUST_EXT_DEBUG"] = "0" 
 else:
-    os.environ["NEO4J_RUST_EXT_DEBUG"] = "0" 
+    # Default values for when running under a WSGI server (Elastic Beanstalk)
+    class Args:
+        skip_db_init = False
+        debug = False
+    args = Args()
 
 print("Starting import of modules...")
 
@@ -101,6 +107,17 @@ def create_app():
             return "Image similarity API - Visit /admin for management"
         
         print("Flask app created successfully")
+        
+        # Initialize database if we're not in local dev mode or if we're not skipping DB init
+        if not hasattr(args, 'skip_db_init') or not args.skip_db_init:
+            try:
+                from database import get_db_connection
+                get_db_connection()
+                logger.info("Database initialized during app creation")
+            except Exception as e:
+                logger.error(f"Database initialization error: {e}")
+                logger.error(traceback.format_exc())
+        
         return app
     
     except Exception as e:

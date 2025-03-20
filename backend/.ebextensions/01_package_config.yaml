@@ -1,0 +1,13 @@
+packages:
+  yum:
+    git: []
+    gcc: []
+    gcc-c++: []
+    
+option_settings:
+  aws:elasticbeanstalk:application:environment:
+    PYTHONPATH: "/var/app/current"
+
+commands:
+  01_install_heavy_packages:
+    command: "pip install sentence-transformers"
