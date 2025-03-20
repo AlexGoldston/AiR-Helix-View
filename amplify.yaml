@@ -4,7 +4,7 @@ frontend:
     preBuild:
       commands:
         - cd frontend
-        - npm install  # Changed from npm ci
+        - npm ci
     build:
       commands:
         - npm run build:production
@@ -12,6 +12,3 @@ frontend:
     baseDirectory: build
     files:
       - '**/*'
-  cache:
-    paths:
-      - frontend/node_modules/**/*
